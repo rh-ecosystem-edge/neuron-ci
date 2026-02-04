@@ -1,6 +1,6 @@
 # neuron-ci
 
-CI tests for AWS Neuron operators (Inferentia/Trainium) on OpenShift.
+CI tests for AWS Neuron operators on OpenShift.
 
 This repository contains CI configuration for running Neuron operator tests
-using the eco-gotests framework on ROSA HCP clusters.
+using the eco-gotests framework on ROSA HCP clusters with Inferentia/Trainium types of nodes.
