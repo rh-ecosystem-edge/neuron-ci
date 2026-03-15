@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from operators.constants import (
     DEVICE_PLUGIN_PREFIX,
+    NAMESPACE_KMM,
     NAMESPACE_NFD,
     NAMESPACE_NEURON,
     NEURON_CAPACITY_ID,
@@ -98,6 +99,54 @@ def wait_for_neuron_node_labels(oc: OcRunner, timeout: int = 300) -> None:
     )
 
 
+def _dump_diagnostics(oc: OcRunner) -> None:
+    """Collect diagnostic info when device plugin wait fails."""
+    print("\n--- Device plugin wait DIAGNOSTICS ---")
+
+    print("\n[Module CRs in namespace]")
+    r = oc.run("get", "Module", "-n", NAMESPACE_NEURON, "-o", "yaml", timeout=15)
+    if r.returncode == 0:
+        print(r.stdout or "  (empty)")
+    else:
+        print(f"  (not found or error: {r.stderr})")
+
+    print("\n[DaemonSets in namespace]")
+    r = oc.run("get", "daemonsets", "-n", NAMESPACE_NEURON, "-o", "wide", timeout=15)
+    print(r.stdout or "  (none)")
+
+    print("\n[Pods in namespace]")
+    r = oc.run("get", "pods", "-n", NAMESPACE_NEURON, "-o", "wide", timeout=15)
+    print(r.stdout or "  (none)")
+
+    print("\n[Build pods in KMM namespace]")
+    r = oc.run("get", "pods", "-n", NAMESPACE_KMM, "-o", "wide", timeout=15)
+    print(r.stdout or "  (none)")
+
+    print("\n[Neuron-labeled nodes]")
+    r = oc.run("get", "nodes", "-l", f"{NFD_LABEL_KEY}={NFD_LABEL_VALUE}",
+               "--show-labels", timeout=15)
+    print(r.stdout or "  (none)")
+
+    print("\n[DeviceConfig status]")
+    r = oc.run("get", "DeviceConfig", "-n", NAMESPACE_NEURON, "-o", "yaml", timeout=15)
+    if r.returncode == 0:
+        print(r.stdout or "  (empty)")
+    else:
+        print(f"  (not found or error: {r.stderr})")
+
+    print("\n[Events in neuron namespace (last 20)]")
+    r = oc.run("get", "events", "-n", NAMESPACE_NEURON,
+               "--sort-by=.lastTimestamp", timeout=15)
+    if r.returncode == 0 and r.stdout:
+        lines = r.stdout.strip().splitlines()
+        for line in lines[-20:]:
+            print(f"  {line}")
+    else:
+        print("  (none)")
+
+    print("\n--- End diagnostics ---\n")
+
+
 def wait_for_device_plugin(oc: OcRunner, timeout: int = 600) -> None:
     """Wait for Neuron device plugin DaemonSet to be ready.
 
@@ -105,6 +154,7 @@ def wait_for_device_plugin(oc: OcRunner, timeout: int = 600) -> None:
     """
     print(f"  Waiting for device plugin DaemonSet (timeout={timeout}s)...")
     deadline = time.monotonic() + timeout
+    diag_printed_at = 0
 
     while time.monotonic() < deadline:
         elapsed = int(time.monotonic() + timeout - deadline)
@@ -136,10 +186,15 @@ def wait_for_device_plugin(oc: OcRunner, timeout: int = 600) -> None:
                 return
 
             print(f"    Device plugin {name}: {ready}/{desired} ({elapsed}s)...")
+
+            if desired == 0 and elapsed >= 120 and elapsed - diag_printed_at >= 180:
+                _dump_diagnostics(oc)
+                diag_printed_at = elapsed
             break
 
         time.sleep(10)
 
+    _dump_diagnostics(oc)
     raise RuntimeError(
         f"Neuron device plugin DaemonSet did not become ready within {timeout}s"
     )
