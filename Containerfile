@@ -1,7 +1,7 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 LABEL maintainer="rh-ecosystem-edge"
 
-RUN microdnf install -y python3 python3-pip tar gzip jq make && \
+RUN microdnf install -y python3 python3-pip tar gzip jq && \
     microdnf clean all
 
 RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz \
