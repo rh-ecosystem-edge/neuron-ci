@@ -10,7 +10,6 @@ Steps (matching eco-gotests neuronhelpers/deploy.go DeployAllOperators):
 7. Wait for NFD to label nodes with aws-neuron label
 8. Create DeviceConfig CR with driver/plugin images
 9. Wait for device plugin DaemonSet to be ready
-10. Wait for aws.amazon.com/neurondevice resources on nodes
 """
 
 from __future__ import annotations
@@ -47,7 +46,6 @@ from operators.install import install_operator
 from operators.wait import (
     wait_for_device_plugin,
     wait_for_neuron_node_labels,
-    wait_for_neuron_resources,
     wait_for_nfd_workers,
 )
 
@@ -71,7 +69,6 @@ class NeuronInstallConfig:
     nfd_workers_timeout: int = 300
     node_label_timeout: int = 300
     device_plugin_timeout: int = 600
-    neuron_resources_timeout: int = 600
 
 
 def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
@@ -130,7 +127,7 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
     create_neuron_nfd_rule(oc)
     wait_for_neuron_node_labels(oc, timeout=config.node_label_timeout)
 
-    # Steps 8-10: Create DeviceConfig, wait for device plugin and resources
+    # Steps 8-9: Create DeviceConfig, wait for device plugin
     if config.drivers_image and config.driver_version and config.device_plugin_image:
         create_device_config(
             oc,
@@ -142,7 +139,6 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
             scheduler_extension_image=config.scheduler_extension_image,
         )
         wait_for_device_plugin(oc, timeout=config.device_plugin_timeout)
-        wait_for_neuron_resources(oc, timeout=config.neuron_resources_timeout)
     else:
         print("  Skipping DeviceConfig (driver images not configured)")
 
