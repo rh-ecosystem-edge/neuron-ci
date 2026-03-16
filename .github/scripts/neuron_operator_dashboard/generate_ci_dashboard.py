@@ -21,6 +21,14 @@ from neuron_operator_dashboard.fetch_ci_data import (
 )
 
 
+def ts_to_str(ts: str) -> str:
+    try:
+        dt = datetime.fromtimestamp(int(ts), tz=timezone.utc)
+        return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+    except (ValueError, TypeError, OSError):
+        return "unknown"
+
+
 def generate_test_matrix(ocp_data: Dict[str, Dict[str, Any]]) -> str:
     header = load_template("header.html")
     html_content = header
@@ -40,11 +48,13 @@ def generate_test_matrix(ocp_data: Dict[str, Dict[str, Any]]) -> str:
 
         notes_html = build_notes(notes)
         table_rows_html = build_table_rows(valid_results)
+        job_history_html = build_job_history(valid_results)
 
         block = main_table_template
         block = block.replace("{ocp_key}", ocp_key)
         block = block.replace("{table_rows}", table_rows_html)
         block = block.replace("{notes}", notes_html)
+        block = block.replace("{job_history}", job_history_html)
         html_content += block
 
     footer = load_template("footer.html")
@@ -75,43 +85,74 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
             ver_key = row.get(NEURON_OPERATOR_VERSION, "unknown")
             version_groups.setdefault(ver_key, []).append(row)
 
-        final_results: Dict[str, Dict[str, Any]] = {}
-        for ver, ver_results in version_groups.items():
+        for ver in sorted(version_groups.keys(), reverse=True):
+            ver_results = version_groups[ver]
             has_success = any(r["test_status"] == "SUCCESS" for r in ver_results)
             if has_success:
                 chosen = max(
                     [r for r in ver_results if r["test_status"] == "SUCCESS"],
                     key=lambda r: int(r.get("job_timestamp", "0")),
                 )
-                final_results[ver] = {**chosen, "final_status": "SUCCESS"}
             else:
                 chosen = max(ver_results, key=lambda r: int(r.get("job_timestamp", "0")))
-                final_results[ver] = {**chosen, "final_status": "FAILURE"}
 
-        sorted_results = sorted(final_results.values(), key=lambda r: r.get(NEURON_OPERATOR_VERSION, ""), reverse=True)
-
-        links = []
-        for r in sorted_results:
-            label = r.get(NEURON_OPERATOR_VERSION, "unknown")
-            driver = r.get(NEURON_DRIVER_VERSION, "")
+            label = ver
+            driver = chosen.get(NEURON_DRIVER_VERSION, "")
             if driver and driver != "unknown":
                 label = f"{label} (driver {driver})"
-            url = r.get("prow_job_url", "#")
-            if r["final_status"] == "SUCCESS":
-                link = f'<a href="{url}">{label}</a>'
+            url = chosen.get("prow_job_url", "#")
+            status = chosen.get("test_status", "FAILURE")
+            timestamp = ts_to_str(chosen.get("job_timestamp", "0"))
+
+            if status == "SUCCESS":
+                link_class = "success"
+                status_html = '<span class="status-success">&#10004; Passed</span>'
             else:
-                link = f'<a href="{url}">{label} (Failed)</a>'
-            links.append(link)
+                link_class = "failed"
+                status_html = '<span class="status-failure">&#10008; Failed</span>'
 
-        links_html = ", ".join(links)
-
-        rows_html += f"""<tr>
+            rows_html += f"""<tr>
 <td>{ocp_full}</td>
-<td>{links_html}</td>
+<td><a class="{link_class}" href="{url}">{label}</a></td>
+<td>{status_html}</td>
+<td><span class="timestamp">{timestamp}</span></td>
 </tr>
 """
 
     return rows_html
+
+
+def build_job_history(results: List[Dict[str, Any]]) -> str:
+    if not results:
+        return ""
+
+    sorted_results = sorted(results, key=lambda r: int(r.get("job_timestamp", "0")))
+
+    if sorted_results:
+        latest_ts = ts_to_str(sorted_results[-1].get("job_timestamp", "0"))
+    else:
+        return ""
+
+    squares = []
+    for r in sorted_results:
+        status = r.get("test_status", "FAILURE")
+        css_class = "success" if status == "SUCCESS" else "failure"
+        ts = ts_to_str(r.get("job_timestamp", "0"))
+        url = r.get("prow_job_url", "#")
+        driver = r.get(NEURON_DRIVER_VERSION, "unknown")
+        tooltip = f"Status: {status} | Driver: {driver} | {ts}"
+        squares.append(
+            f'<a href="{url}" class="job-square {css_class}" title="{tooltip}"></a>'
+        )
+
+    squares_html = "\n".join(squares)
+    return f"""<div style="margin-top: 12px;">
+<strong>Job History</strong> <span class="timestamp">Latest: {latest_ts}</span>
+<div class="job-history">
+{squares_html}
+</div>
+</div>
+"""
 
 
 def build_notes(notes: List[str]) -> str:
