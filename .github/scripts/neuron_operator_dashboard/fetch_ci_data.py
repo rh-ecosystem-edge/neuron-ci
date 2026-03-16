@@ -271,6 +271,12 @@ def process_tests_for_pr(
         if not match:
             logger.warning(f"Could not parse: {pr_num}, {job_name}, {build_id}")
             continue
+
+        key = (pr_num, job_name, build_id)
+        if "finished" not in build_files.get(key, {}):
+            logger.info(f"Skipping build {build_id} (no finished.json, job may still be running)")
+            continue
+
         ocp_version = match.group("ocp_version")
 
         logger.info(f"Processing build {build_id} for OCP {ocp_version}")
