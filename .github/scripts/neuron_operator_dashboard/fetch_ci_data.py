@@ -36,6 +36,15 @@ TEST_RESULT_PATH_REGEX = re.compile(
     r"/(?P<build_id>[^/]+)"
 )
 
+# Matches periodic job paths.
+PERIODIC_RESULT_PATH_REGEX = re.compile(
+    r"logs/(?P<job_name>periodic-ci-rh-ecosystem-edge-neuron-ci-main-"
+    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-e2e(?P<job_suffix>[^/]*))"
+    r"/(?P<build_id>\d+)"
+)
+
+PERIODIC_JOB_GCS_PREFIX = "logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-"
+
 GCS_MAX_RESULTS_PER_REQUEST = 1000
 
 
@@ -294,6 +303,133 @@ def process_tests_for_pr(
             results_by_ocp[ocp_version]["tests"].append(result.to_dict())
 
 
+def list_periodic_job_prefixes() -> List[str]:
+    """Discover all periodic job prefixes in GCS (one per OCP version)."""
+    logger.info("Discovering periodic job prefixes...")
+    params = {
+        "prefix": PERIODIC_JOB_GCS_PREFIX,
+        "delimiter": "/",
+        "maxResults": "100",
+        "alt": "json",
+    }
+    headers = {"Accept": "application/json"}
+    response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
+    prefixes = response_data.get("prefixes", [])
+    logger.info(f"Found {len(prefixes)} periodic job prefix(es)")
+    return prefixes
+
+
+def list_periodic_builds(job_prefix: str, max_builds: int = 10) -> List[str]:
+    """List recent build IDs for a periodic job prefix."""
+    params = {
+        "prefix": job_prefix,
+        "delimiter": "/",
+        "maxResults": str(max_builds),
+        "alt": "json",
+    }
+    headers = {"Accept": "application/json"}
+    response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
+    build_prefixes = response_data.get("prefixes", [])
+    build_ids = []
+    for bp in build_prefixes:
+        build_id = bp.rstrip("/").rsplit("/", 1)[-1]
+        if build_id.isdigit():
+            build_ids.append(build_id)
+    build_ids.sort(reverse=True)
+    return build_ids[:max_builds]
+
+
+def process_periodic_build(
+    job_name: str,
+    build_id: str,
+    ocp_version: str,
+) -> Optional[TestResult]:
+    """Process a single periodic build and return a TestResult, or None on failure."""
+    base_path = f"logs/{job_name}/{build_id}"
+    finished_path = f"{base_path}/finished.json"
+
+    try:
+        finished_content = fetch_gcs_file_content(finished_path)
+    except requests.HTTPError:
+        logger.info(f"No finished.json for periodic build {build_id}, skipping")
+        return None
+
+    finished_data = json.loads(finished_content)
+    status = finished_data.get("result", STATUS_ABORTED)
+    timestamp = finished_data.get("timestamp", 0)
+    job_url = build_prow_job_url(finished_path)
+
+    # The test step name mirrors the ci-operator test name
+    test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
+    test_name = f"aws-neuron-operator-e2e-{test_step}"
+    artifact_base = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-test/artifacts"
+
+    ocp_exact = ocp_version
+    operator_ver = "unknown"
+    driver_ver = "unknown"
+
+    for file_name, setter in [
+        ("ocp.version", "ocp"),
+        ("operator.version", "operator"),
+        ("driver.version", "driver"),
+    ]:
+        try:
+            content = fetch_gcs_file_content(f"{artifact_base}/{file_name}").strip()
+            if setter == "ocp":
+                ocp_exact = content
+            elif setter == "operator":
+                operator_ver = content
+            elif setter == "driver":
+                driver_ver = content
+        except requests.HTTPError:
+            pass
+
+    return TestResult(
+        ocp_full_version=ocp_exact,
+        neuron_operator_version=operator_ver,
+        neuron_driver_version=driver_ver,
+        test_status=status,
+        prow_job_url=job_url,
+        job_timestamp=str(timestamp),
+    )
+
+
+def process_periodic_tests(
+    results_by_ocp: Dict[str, Dict[str, Any]],
+    max_builds: int = 10,
+) -> None:
+    """Fetch and process results from periodic (cron-scheduled) jobs."""
+    logger.info("Processing periodic job results...")
+    prefixes = list_periodic_job_prefixes()
+
+    for prefix in prefixes:
+        job_name = prefix.strip("/").split("/", 1)[-1]
+        match = PERIODIC_RESULT_PATH_REGEX.search(f"logs/{job_name}/0")
+        if not match:
+            logger.warning(f"Could not parse periodic prefix: {prefix}")
+            continue
+
+        ocp_version = match.group("ocp_version")
+        logger.info(f"Processing periodic jobs for OCP {ocp_version}: {job_name}")
+
+        build_ids = list_periodic_builds(prefix, max_builds=max_builds)
+        logger.info(f"Found {len(build_ids)} recent builds")
+
+        results_by_ocp.setdefault(ocp_version, {"tests": [], "job_history_links": set()})
+
+        job_history_url = (
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results"
+            f"/logs/{job_name}"
+        )
+        results_by_ocp[ocp_version]["job_history_links"].add(job_history_url)
+
+        for build_id in build_ids:
+            logger.info(f"Processing periodic build {build_id}")
+            result = process_periodic_build(job_name, build_id, ocp_version)
+            if result and result.has_exact_versions() and result.test_status != STATUS_ABORTED:
+                results_by_ocp[ocp_version]["tests"].append(result.to_dict())
+
+
 def process_closed_prs(results_by_ocp: Dict[str, Dict[str, Any]]) -> None:
     logger.info("Retrieving PR history...")
     url = "https://api.github.com/repos/rh-ecosystem-edge/neuron-ci/pulls"
@@ -371,6 +507,10 @@ def main() -> None:
         "--pr_number", default="all",
         help='PR number to process; use "all" for full history',
     )
+    parser.add_argument(
+        "--include_periodic", action="store_true", default=False,
+        help="Also fetch results from periodic (cron-scheduled) jobs",
+    )
     parser.add_argument("--baseline_data_filepath", required=True)
     parser.add_argument("--merged_data_filepath", required=True)
     args = parser.parse_args()
@@ -388,6 +528,9 @@ def main() -> None:
         process_closed_prs(local_results)
     else:
         process_tests_for_pr(args.pr_number, local_results)
+
+    if args.include_periodic:
+        process_periodic_tests(local_results)
 
     merge_and_save_results(local_results, args.merged_data_filepath, existing_results)
 
