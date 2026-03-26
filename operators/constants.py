@@ -4,6 +4,8 @@
 NAMESPACE_NFD = "openshift-nfd"
 NAMESPACE_KMM = "openshift-kmm"
 NAMESPACE_NEURON = "ai-operator-on-aws"
+NAMESPACE_MONITORING = "openshift-monitoring"
+NAMESPACE_USER_WORKLOAD_MONITORING = "openshift-user-workload-monitoring"
 
 # NFD operator
 NFD_PACKAGE = "nfd"

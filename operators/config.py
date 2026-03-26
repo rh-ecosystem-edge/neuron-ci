@@ -12,6 +12,7 @@ from operators.constants import (
     DEVICE_CONFIG_NAME,
     DEVICE_IDS,
     DEVICE_PLUGIN_PREFIX,
+    NAMESPACE_MONITORING,
     NAMESPACE_NFD,
     NAMESPACE_NEURON,
     NEURON_CAPACITY_ID,
@@ -24,6 +25,37 @@ from operators.constants import (
 
 if TYPE_CHECKING:
     from operators.oc import OcRunner
+
+
+def enable_user_workload_monitoring(oc: OcRunner) -> None:
+    """Enable user workload monitoring so Prometheus scrapes ServiceMonitors in user namespaces.
+
+    Without this, the platform Prometheus only scrapes targets in openshift-*
+    namespaces and the Neuron metrics ServiceMonitor (in ai-operator-on-aws)
+    is never scraped.
+    """
+    r = oc.run(
+        "get", "configmap", "cluster-monitoring-config",
+        "-n", NAMESPACE_MONITORING,
+        "-o", "jsonpath={.data.config\\.yaml}",
+        timeout=10,
+    )
+
+    if r.returncode == 0 and r.stdout and "enableUserWorkload" in r.stdout:
+        print("  User workload monitoring already configured")
+        return
+
+    print("  Enabling user workload monitoring")
+    oc.apply_stdin(f"""\
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-monitoring-config
+  namespace: {NAMESPACE_MONITORING}
+data:
+  config.yaml: |
+    enableUserWorkload: true
+""")
 
 
 def create_nfd_instance(oc: OcRunner) -> None:
