@@ -14,6 +14,7 @@ from operators.constants import (
     NAMESPACE_KMM,
     NAMESPACE_NFD,
     NAMESPACE_NEURON,
+    NAMESPACE_USER_WORKLOAD_MONITORING,
     NEURON_CAPACITY_ID,
     NFD_LABEL_KEY,
     NFD_LABEL_VALUE,
@@ -256,4 +257,40 @@ def wait_for_neuron_resources(oc: OcRunner, timeout: int = 600) -> None:
 
     raise RuntimeError(
         f"Neuron device resources did not appear on nodes within {timeout}s"
+    )
+
+
+def wait_for_user_workload_monitoring(oc: OcRunner, timeout: int = 300) -> None:
+    """Wait for the user workload monitoring Prometheus pods to be ready.
+
+    After enabling user workload monitoring via the cluster-monitoring-config
+    ConfigMap, the cluster-monitoring-operator deploys a Prometheus instance
+    in openshift-user-workload-monitoring. This function waits for at least
+    one prometheus-user-workload pod to reach Running state.
+    """
+    print(f"  Waiting for user workload monitoring pods (timeout={timeout}s)...")
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        elapsed = int(time.monotonic() + timeout - deadline)
+
+        r = oc.run(
+            "get", "pods", "-n", NAMESPACE_USER_WORKLOAD_MONITORING,
+            "-l", "app.kubernetes.io/name=prometheus",
+            "--no-headers",
+            timeout=15,
+        )
+
+        if r.returncode == 0 and r.stdout and r.stdout.strip():
+            for line in r.stdout.strip().splitlines():
+                parts = line.split()
+                if len(parts) >= 3 and parts[2] == "Running":
+                    print(f"    User workload monitoring is ready")
+                    return
+
+        print(f"    User workload monitoring pods not ready yet ({elapsed}s)...")
+        time.sleep(10)
+
+    raise RuntimeError(
+        f"User workload monitoring pods did not become ready within {timeout}s"
     )

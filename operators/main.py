@@ -1,6 +1,7 @@
 """Orchestrate AWS Neuron Operator and dependencies installation.
 
 Steps (matching eco-gotests neuronhelpers/deploy.go DeployAllOperators):
+0. Enable user workload monitoring (required for Neuron metrics scraping)
 1. Install NFD operator via OLM
 2. Create NodeFeatureDiscovery instance (starts NFD worker pods)
 3. Wait for NFD workers to be ready
@@ -8,8 +9,9 @@ Steps (matching eco-gotests neuronhelpers/deploy.go DeployAllOperators):
 5. Install Neuron operator via OLM (community-operators, Fast channel)
 6. Create NodeFeatureRule for Neuron PCI devices
 7. Wait for NFD to label nodes with aws-neuron label
-8. Create DeviceConfig CR with driver/plugin images
-9. Wait for device plugin DaemonSet to be ready
+8. Wait for user workload monitoring pods to be ready
+9. Create DeviceConfig CR with driver/plugin images
+10. Wait for device plugin DaemonSet to be ready
 """
 
 from __future__ import annotations
@@ -21,6 +23,7 @@ from operators.config import (
     create_device_config,
     create_neuron_nfd_rule,
     create_nfd_instance,
+    enable_user_workload_monitoring,
 )
 from operators.constants import (
     KMM_CATALOG,
@@ -47,6 +50,7 @@ from operators.wait import (
     wait_for_device_plugin,
     wait_for_neuron_node_labels,
     wait_for_nfd_workers,
+    wait_for_user_workload_monitoring,
 )
 
 if TYPE_CHECKING:
@@ -81,6 +85,10 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
     print("\n" + "=" * 60)
     print("AWS Neuron Operator & Dependencies Installation (OLM)")
     print("=" * 60)
+
+    # Step 0: Enable user workload monitoring (needed for metrics scraping).
+    # Done early so the monitoring pods can start while operators install.
+    enable_user_workload_monitoring(oc)
 
     # Step 1: Install NFD operator
     install_operator(
@@ -126,6 +134,10 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
     # Step 6-7: Create NFD rule and wait for node labels
     create_neuron_nfd_rule(oc)
     wait_for_neuron_node_labels(oc, timeout=config.node_label_timeout)
+
+    # Wait for user workload monitoring to be ready before creating DeviceConfig,
+    # so Prometheus is scraping by the time the metrics tests run.
+    wait_for_user_workload_monitoring(oc)
 
     # Steps 8-9: Create DeviceConfig, wait for device plugin
     if config.drivers_image and config.driver_version and config.device_plugin_image:
