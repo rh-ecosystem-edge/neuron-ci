@@ -5,6 +5,8 @@ on:
     branches:
       - main
     types: [closed]
+  schedule:
+    - cron: '0 12 * * *'
   workflow_dispatch:
     inputs:
       branch:
@@ -46,6 +48,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" == "pull_request_target" ]; then
             echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "PR_NUMBER=all" >> "$GITHUB_OUTPUT"
           else
             echo "PR_NUMBER=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
           fi
@@ -53,7 +57,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.base.ref || github.event.inputs.branch }}
+          ref: ${{ github.event.pull_request.base.ref || github.event.inputs.branch || 'main' }}
 
       - name: Checkout GitHub Pages
         uses: actions/checkout@v5
@@ -82,8 +86,13 @@ jobs:
       - name: Fetch CI Data
         run: |
           echo "Processing PR: ${{ steps.determine_pr.outputs.PR_NUMBER }}"
+          PERIODIC_FLAG=""
+          if [ "${{ github.event_name }}" == "schedule" ] || [ "${{ steps.determine_pr.outputs.PR_NUMBER }}" == "all" ]; then
+            PERIODIC_FLAG="--include_periodic"
+          fi
           PYTHONPATH=.github/scripts python -m neuron_operator_dashboard.fetch_ci_data \
             --pr_number "${{ steps.determine_pr.outputs.PR_NUMBER }}" \
+            $PERIODIC_FLAG \
             --baseline_data_filepath "${{ env.DASHBOARD_DATA_FILEPATH }}" \
             --merged_data_filepath "${{ env.DASHBOARD_DATA_FILEPATH }}"
 
