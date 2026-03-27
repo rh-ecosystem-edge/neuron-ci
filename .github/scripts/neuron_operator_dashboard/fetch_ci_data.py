@@ -357,7 +357,10 @@ def process_periodic_build(
     finished_data = json.loads(finished_content)
     status = finished_data.get("result", STATUS_ABORTED)
     timestamp = finished_data.get("timestamp", 0)
-    job_url = build_prow_job_url(finished_path)
+    job_url = (
+        f"https://prow.ci.openshift.org/view/gs/test-platform-results"
+        f"/logs/{job_name}/{build_id}"
+    )
 
     # The test step name mirrors the ci-operator test name
     test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
@@ -426,7 +429,7 @@ def process_periodic_tests(
         for build_id in build_ids:
             logger.info(f"Processing periodic build {build_id}")
             result = process_periodic_build(job_name, build_id, ocp_version)
-            if result and result.has_exact_versions() and result.test_status != STATUS_ABORTED:
+            if result and result.test_status != STATUS_ABORTED:
                 results_by_ocp[ocp_version]["tests"].append(result.to_dict())
 
 
