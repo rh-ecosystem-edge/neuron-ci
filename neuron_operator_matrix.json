@@ -31,5 +31,21 @@
             "https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e-weekly",
             "https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e"
         ]
+    },
+    "4.19": {
+        "notes": [],
+        "tests": [
+            {
+                "ocp_full_version": "4.19",
+                "neuron_operator_version": "unknown",
+                "neuron_driver_version": "unknown",
+                "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e-weekly/2038134298581667840",
+                "job_timestamp": "1774770075"
+            }
+        ],
+        "job_history_links": [
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e-weekly"
+        ]
     }
 }
