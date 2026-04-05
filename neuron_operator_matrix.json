@@ -56,8 +56,8 @@
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "2.25.4.0",
                 "test_status": "FAILURE",
-                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/1/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e/2038263374403342336",
-                "job_timestamp": "1774800887"
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e-weekly/2040671140124299264",
+                "job_timestamp": "1775377717"
             },
             {
                 "ocp_full_version": "4.19",
