@@ -7,6 +7,7 @@ Adapted from rh-ecosystem-edge/nvidia-ci gpu_operator_dashboard.
 """
 import argparse
 import json
+import os
 import re
 import urllib.parse
 from dataclasses import dataclass
@@ -441,6 +442,11 @@ def process_closed_prs(results_by_ocp: Dict[str, Dict[str, Any]]) -> None:
         "Accept": "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
     }
+    gh_token = os.environ.get("GITHUB_TOKEN")
+    if gh_token:
+        headers["Authorization"] = f"Bearer {gh_token}"
+    else:
+        logger.warning("GITHUB_TOKEN not set; GitHub API requests may be rate-limited")
     response_data = http_get_json(url, params=params, headers=headers)
     for pr in response_data:
         pr_number = str(pr["number"])

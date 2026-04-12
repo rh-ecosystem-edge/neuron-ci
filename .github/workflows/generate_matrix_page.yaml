@@ -84,6 +84,8 @@ jobs:
         run: pip install -r .github/scripts/neuron_operator_dashboard/requirements.txt
 
       - name: Fetch CI Data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Processing PR: ${{ steps.determine_pr.outputs.PR_NUMBER }}"
           PERIODIC_FLAG=""
