@@ -202,7 +202,7 @@ def wait_for_device_plugin(oc: OcRunner, timeout: int = 600) -> None:
 
 
 def wait_for_neuron_resources(oc: OcRunner, timeout: int = 600) -> None:
-    """Wait for aws.amazon.com/neurondevice resources on labeled nodes.
+    """Wait for aws.amazon.com/neuron resources on labeled nodes.
 
     Matches eco-gotests await/await.go AllNeuronNodesResourceAvailable().
     """
