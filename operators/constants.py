@@ -3,7 +3,7 @@
 # Namespaces
 NAMESPACE_NFD = "openshift-nfd"
 NAMESPACE_KMM = "openshift-kmm"
-NAMESPACE_NEURON = "ai-operator-on-aws"
+NAMESPACE_NEURON = "aws-neuron-operator"
 NAMESPACE_MONITORING = "openshift-monitoring"
 NAMESPACE_USER_WORKLOAD_MONITORING = "openshift-user-workload-monitoring"
 
@@ -41,7 +41,7 @@ DEVICE_CONFIG_NAME = "neuron"
 DEVICE_CONFIG_API_VERSION = "k8s.aws/v1beta1"
 
 # Kubernetes resource names
-NEURON_CAPACITY_ID = "aws.amazon.com/neurondevice"
+NEURON_CAPACITY_ID = "aws.amazon.com/neuron"
 DEVICE_PLUGIN_PREFIX = "neuron-device-plugin"
 
 # OLM

@@ -31,7 +31,7 @@ def enable_user_workload_monitoring(oc: OcRunner) -> None:
     """Enable user workload monitoring so Prometheus scrapes ServiceMonitors in user namespaces.
 
     Without this, the platform Prometheus only scrapes targets in openshift-*
-    namespaces and the Neuron metrics ServiceMonitor (in ai-operator-on-aws)
+    namespaces and the Neuron metrics ServiceMonitor (in aws-neuron-operator)
     is never scraped.
     """
     r = oc.run(
