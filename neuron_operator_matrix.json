@@ -6,17 +6,17 @@
                 "ocp_full_version": "4.20.16",
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "2.25.4.0",
-                "test_status": "SUCCESS",
-                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/12/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e/2044434795143892992",
-                "job_timestamp": "1776272688"
+                "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e-weekly/2043570255405518848",
+                "job_timestamp": "1776066626"
             },
             {
                 "ocp_full_version": "4.20.15",
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "2.25.4.0",
                 "test_status": "SUCCESS",
-                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/12/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e/2038977059664957440",
-                "job_timestamp": "1774971201"
+                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/1/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e/2038942099113512960",
+                "job_timestamp": "1774962837"
             },
             {
                 "ocp_full_version": "4.20.17",
@@ -55,17 +55,17 @@
                 "ocp_full_version": "4.19.26",
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "2.25.4.0",
-                "test_status": "SUCCESS",
-                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/12/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e/2044711360050237440",
-                "job_timestamp": "1776338814"
+                "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e-weekly/2043207801613848576",
+                "job_timestamp": "1775980337"
             },
             {
                 "ocp_full_version": "4.19.25",
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "2.25.4.0",
-                "test_status": "FAILURE",
-                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/12/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e/2042196865750929408",
-                "job_timestamp": "1775738783"
+                "test_status": "SUCCESS",
+                "prow_job_url": "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/test-platform-results/pr-logs/pull/rh-ecosystem-edge_neuron-ci/1/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e/2038604840166232064",
+                "job_timestamp": "1774886187"
             },
             {
                 "ocp_full_version": "4.19",
