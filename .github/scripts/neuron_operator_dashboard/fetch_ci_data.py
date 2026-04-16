@@ -75,6 +75,24 @@ def build_prow_job_url(finished_json_path: str) -> str:
     )
 
 
+def get_test_step_status(base_path: str) -> Optional[str]:
+    """Read the test step's own finished.json to get the actual test result.
+
+    The overall job can fail due to infrastructure cleanup (e.g. VPC stack
+    deletion) even when all tests passed.  The test step has its own
+    finished.json under artifacts/ whose result reflects only the tests.
+    """
+    for test_name in ("aws-neuron-operator-e2e", "aws-neuron-operator-e2e-weekly"):
+        path = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-test/finished.json"
+        try:
+            content = fetch_gcs_file_content(path)
+            data = json.loads(content)
+            return data.get("result")
+        except (requests.HTTPError, json.JSONDecodeError, KeyError):
+            continue
+    return None
+
+
 class TestResultKey(BaseModel):
     ocp_full_version: str
     neuron_operator_version: str
@@ -242,6 +260,16 @@ def process_single_build(
     timestamp = finished_data["timestamp"]
     job_url = build_prow_job_url(bfs["finished"]["name"])
 
+    # If the overall job failed, check whether the test step itself passed.
+    # Post-test cleanup failures (e.g. VPC stack deletion) should not mask
+    # a successful test run on the dashboard.
+    if status != STATUS_SUCCESS:
+        base_path = bfs["finished"]["name"].rsplit("/finished.json", 1)[0]
+        test_status = get_test_step_status(base_path)
+        if test_status == STATUS_SUCCESS:
+            logger.info(f"Overriding job status to SUCCESS (test step passed, job failed in cleanup)")
+            status = STATUS_SUCCESS
+
     ocp_exact = ocp_version
     operator_ver = "unknown"
     driver_ver = "unknown"
@@ -362,6 +390,13 @@ def process_periodic_build(
         f"https://prow.ci.openshift.org/view/gs/test-platform-results"
         f"/logs/{job_name}/{build_id}"
     )
+
+    # If the overall job failed, check whether the test step itself passed.
+    if status != STATUS_SUCCESS:
+        test_status = get_test_step_status(base_path)
+        if test_status == STATUS_SUCCESS:
+            logger.info(f"Overriding periodic job status to SUCCESS (test step passed)")
+            status = STATUS_SUCCESS
 
     # The test step name mirrors the ci-operator test name
     test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
