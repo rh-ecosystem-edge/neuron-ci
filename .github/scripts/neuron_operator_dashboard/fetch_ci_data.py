@@ -353,14 +353,24 @@ def list_periodic_builds(job_prefix: str, max_builds: int = 10) -> List[str]:
     params = {
         "prefix": job_prefix,
         "delimiter": "/",
-        "maxResults": str(max_builds),
+        "maxResults": str(GCS_MAX_RESULTS_PER_REQUEST),
         "alt": "json",
     }
     headers = {"Accept": "application/json"}
-    response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
-    build_prefixes = response_data.get("prefixes", [])
+    all_prefixes: List[str] = []
+    next_page_token = None
+
+    while True:
+        if next_page_token:
+            params["pageToken"] = next_page_token
+        response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
+        all_prefixes.extend(response_data.get("prefixes", []))
+        next_page_token = response_data.get("nextPageToken")
+        if not next_page_token:
+            break
+
     build_ids = []
-    for bp in build_prefixes:
+    for bp in all_prefixes:
         build_id = bp.rstrip("/").rsplit("/", 1)[-1]
         if build_id.isdigit():
             build_ids.append(build_id)
