@@ -60,6 +60,14 @@
         "notes": [],
         "tests": [
             {
+                "ocp_full_version": "4.19.27",
+                "neuron_operator_version": "1.1.4",
+                "neuron_driver_version": "2.25.4.0",
+                "test_status": "SUCCESS",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.19-stable-aws-neuron-operator-e2e-weekly/2048281071224623104",
+                "job_timestamp": "1777189763"
+            },
+            {
                 "ocp_full_version": "4.19.26",
                 "neuron_operator_version": "1.1.3",
                 "neuron_driver_version": "2.25.4.0",
