@@ -17,6 +17,7 @@ from neuron_operator_dashboard.fetch_ci_data import (
     OCP_FULL_VERSION,
     NEURON_OPERATOR_VERSION,
     NEURON_DRIVER_VERSION,
+    KMM_SANITY_STATUS,
     STATUS_ABORTED,
 )
 
@@ -109,10 +110,19 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
             link_class = "failed"
             status_html = '<span class="status-failure">&#10008; Failed</span>'
 
+        kmm_status = chosen.get(KMM_SANITY_STATUS, "N/A")
+        if kmm_status == "SUCCESS":
+            kmm_html = '<span class="status-success">&#10004; Passed</span>'
+        elif kmm_status == "FAILURE":
+            kmm_html = '<span class="status-failure">&#10008; Failed</span>'
+        else:
+            kmm_html = '<span class="timestamp">N/A</span>'
+
         rows_html += f"""<tr>
 <td>{ocp_full}</td>
 <td><a class="{link_class}" href="{url}">{label}</a></td>
 <td>{status_html}</td>
+<td>{kmm_html}</td>
 <td><span class="timestamp">{timestamp}</span></td>
 </tr>
 """
