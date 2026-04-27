@@ -70,23 +70,14 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
         ocp_full = r.get(OCP_FULL_VERSION, "unknown")
         grouped.setdefault(ocp_full, []).append(r)
 
-    rows_html = ""
-    ocp_versions = list(grouped.keys())
-    try:
-        ocp_versions.sort(key=lambda v: semver.VersionInfo.parse(v), reverse=True)
-    except (ValueError, TypeError):
-        ocp_versions.sort(reverse=True)
-
-    for ocp_full in ocp_versions:
-        rows = grouped[ocp_full]
-
+    selected_rows: List[Dict[str, Any]] = []
+    for ocp_full, rows in grouped.items():
         version_groups: Dict[str, List[Dict[str, Any]]] = {}
         for row in rows:
             ver_key = row.get(NEURON_OPERATOR_VERSION, "unknown")
             version_groups.setdefault(ver_key, []).append(row)
 
-        for ver in sorted(version_groups.keys(), reverse=True):
-            ver_results = version_groups[ver]
+        for ver, ver_results in version_groups.items():
             has_success = any(r["test_status"] == "SUCCESS" for r in ver_results)
             if has_success:
                 chosen = max(
@@ -95,23 +86,30 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
                 )
             else:
                 chosen = max(ver_results, key=lambda r: int(r.get("job_timestamp", "0")))
+            selected_rows.append({"ocp_full": ocp_full, "ver": ver, "chosen": chosen})
 
-            label = ver
-            driver = chosen.get(NEURON_DRIVER_VERSION, "")
-            if driver and driver != "unknown":
-                label = f"{label} (driver {driver})"
-            url = chosen.get("prow_job_url", "#")
-            status = chosen.get("test_status", "FAILURE")
-            timestamp = ts_to_str(chosen.get("job_timestamp", "0"))
+    selected_rows.sort(key=lambda r: int(r["chosen"].get("job_timestamp", "0")), reverse=True)
 
-            if status == "SUCCESS":
-                link_class = "success"
-                status_html = '<span class="status-success">&#10004; Passed</span>'
-            else:
-                link_class = "failed"
-                status_html = '<span class="status-failure">&#10008; Failed</span>'
+    rows_html = ""
+    for entry in selected_rows:
+        ocp_full = entry["ocp_full"]
+        chosen = entry["chosen"]
+        label = entry["ver"]
+        driver = chosen.get(NEURON_DRIVER_VERSION, "")
+        if driver and driver != "unknown":
+            label = f"{label} (driver {driver})"
+        url = chosen.get("prow_job_url", "#")
+        status = chosen.get("test_status", "FAILURE")
+        timestamp = ts_to_str(chosen.get("job_timestamp", "0"))
 
-            rows_html += f"""<tr>
+        if status == "SUCCESS":
+            link_class = "success"
+            status_html = '<span class="status-success">&#10004; Passed</span>'
+        else:
+            link_class = "failed"
+            status_html = '<span class="status-failure">&#10008; Failed</span>'
+
+        rows_html += f"""<tr>
 <td>{ocp_full}</td>
 <td><a class="{link_class}" href="{url}">{label}</a></td>
 <td>{status_html}</td>
