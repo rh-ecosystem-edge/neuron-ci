@@ -22,6 +22,7 @@ from common.utils import logger
 OCP_FULL_VERSION = "ocp_full_version"
 NEURON_OPERATOR_VERSION = "neuron_operator_version"
 NEURON_DRIVER_VERSION = "neuron_driver_version"
+KMM_SANITY_STATUS = "kmm_sanity_status"
 
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILURE = "FAILURE"
@@ -75,6 +76,19 @@ def build_prow_job_url(finished_json_path: str) -> str:
     )
 
 
+def get_kmm_test_step_status(base_path: str) -> Optional[str]:
+    """Read the KMM test step's finished.json to get the KMM sanity result."""
+    for test_name in ("aws-neuron-operator-e2e", "aws-neuron-operator-e2e-weekly"):
+        path = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-kmm-test/finished.json"
+        try:
+            content = fetch_gcs_file_content(path)
+            data = json.loads(content)
+            return data.get("result")
+        except (requests.HTTPError, json.JSONDecodeError, KeyError):
+            continue
+    return None
+
+
 def get_test_step_status(base_path: str) -> Optional[str]:
     """Read the test step's own finished.json to get the actual test result.
 
@@ -114,6 +128,7 @@ class TestResult:
     test_status: str
     prow_job_url: str
     job_timestamp: str
+    kmm_sanity_status: str = "N/A"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -123,6 +138,7 @@ class TestResult:
             "test_status": self.test_status,
             "prow_job_url": self.prow_job_url,
             "job_timestamp": self.job_timestamp,
+            KMM_SANITY_STATUS: self.kmm_sanity_status,
         }
 
     def build_key(self) -> Tuple[str, str, str]:
@@ -260,15 +276,18 @@ def process_single_build(
     timestamp = finished_data["timestamp"]
     job_url = build_prow_job_url(bfs["finished"]["name"])
 
+    base_path = bfs["finished"]["name"].rsplit("/finished.json", 1)[0]
+
     # If the overall job failed, check whether the test step itself passed.
     # Post-test cleanup failures (e.g. VPC stack deletion) should not mask
     # a successful test run on the dashboard.
     if status != STATUS_SUCCESS:
-        base_path = bfs["finished"]["name"].rsplit("/finished.json", 1)[0]
         test_status = get_test_step_status(base_path)
         if test_status == STATUS_SUCCESS:
             logger.info(f"Overriding job status to SUCCESS (test step passed, job failed in cleanup)")
             status = STATUS_SUCCESS
+
+    kmm_status = get_kmm_test_step_status(base_path) or "N/A"
 
     ocp_exact = ocp_version
     operator_ver = "unknown"
@@ -288,6 +307,7 @@ def process_single_build(
         test_status=status,
         prow_job_url=job_url,
         job_timestamp=str(timestamp),
+        kmm_sanity_status=kmm_status,
     )
 
 
@@ -408,6 +428,8 @@ def process_periodic_build(
             logger.info(f"Overriding periodic job status to SUCCESS (test step passed)")
             status = STATUS_SUCCESS
 
+    kmm_status = get_kmm_test_step_status(base_path) or "N/A"
+
     # The test step name mirrors the ci-operator test name
     test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
     test_name = f"aws-neuron-operator-e2e-{test_step}"
@@ -440,6 +462,7 @@ def process_periodic_build(
         test_status=status,
         prow_job_url=job_url,
         job_timestamp=str(timestamp),
+        kmm_sanity_status=kmm_status,
     )
 
 
