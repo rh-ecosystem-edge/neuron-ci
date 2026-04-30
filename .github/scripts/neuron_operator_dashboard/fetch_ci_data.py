@@ -23,6 +23,7 @@ OCP_FULL_VERSION = "ocp_full_version"
 NEURON_OPERATOR_VERSION = "neuron_operator_version"
 NEURON_DRIVER_VERSION = "neuron_driver_version"
 KMM_SANITY_STATUS = "kmm_sanity_status"
+KSERVE_STATUS = "kserve_status"
 
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILURE = "FAILURE"
@@ -34,14 +35,14 @@ GCS_API_BASE_URL = "https://storage.googleapis.com/storage/v1/b/test-platform-re
 TEST_RESULT_PATH_REGEX = re.compile(
     r"pr-logs/pull/(?P<repo>[^/]+)/(?P<pr_number>\d+)/"
     r"(?P<job_name>(?:rehearse-\d+-)?pull-ci-rh-ecosystem-edge-neuron-ci-main-"
-    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-e2e(?P<job_suffix>[^/]*))"
+    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-(?P<job_type>kserve-)?e2e(?P<job_suffix>[^/]*))"
     r"/(?P<build_id>[^/]+)"
 )
 
 # Matches periodic job paths.
 PERIODIC_RESULT_PATH_REGEX = re.compile(
     r"logs/(?P<job_name>periodic-ci-rh-ecosystem-edge-neuron-ci-main-"
-    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-e2e(?P<job_suffix>[^/]*))"
+    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-(?P<job_type>kserve-)?e2e(?P<job_suffix>[^/]*))"
     r"/(?P<build_id>\d+)"
 )
 
@@ -96,8 +97,23 @@ def get_test_step_status(base_path: str) -> Optional[str]:
     deletion) even when all tests passed.  The test step has its own
     finished.json under artifacts/ whose result reflects only the tests.
     """
-    for test_name in ("aws-neuron-operator-e2e", "aws-neuron-operator-e2e-weekly"):
-        path = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-test/finished.json"
+    for test_name in ("aws-neuron-operator-e2e", "aws-neuron-operator-e2e-weekly",
+                      "aws-neuron-operator-kserve-e2e", "aws-neuron-operator-kserve-e2e-weekly"):
+        step_name = "aws-neuron-operator-kserve-test" if "kserve" in test_name else "aws-neuron-operator-test"
+        path = f"{base_path}/artifacts/{test_name}/{step_name}/finished.json"
+        try:
+            content = fetch_gcs_file_content(path)
+            data = json.loads(content)
+            return data.get("result")
+        except (requests.HTTPError, json.JSONDecodeError, KeyError):
+            continue
+    return None
+
+
+def get_kserve_test_step_status(base_path: str) -> Optional[str]:
+    """Read the KServe test step's finished.json to get the KServe result."""
+    for test_name in ("aws-neuron-operator-kserve-e2e", "aws-neuron-operator-kserve-e2e-weekly"):
+        path = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-kserve-test/finished.json"
         try:
             content = fetch_gcs_file_content(path)
             data = json.loads(content)
@@ -129,6 +145,7 @@ class TestResult:
     prow_job_url: str
     job_timestamp: str
     kmm_sanity_status: str = "N/A"
+    kserve_status: str = "N/A"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -139,6 +156,7 @@ class TestResult:
             "prow_job_url": self.prow_job_url,
             "job_timestamp": self.job_timestamp,
             KMM_SANITY_STATUS: self.kmm_sanity_status,
+            KSERVE_STATUS: self.kserve_status,
         }
 
     def build_key(self) -> Tuple[str, str, str]:
@@ -186,8 +204,11 @@ def fetch_pr_files(pr_number: str) -> Tuple[
     logger.info(f"Fetching files for PR #{pr_number}")
     finished = fetch_filtered_files(pr_number, "**/finished.json")
     ocp = fetch_filtered_files(pr_number, "**/aws-neuron-operator-test/artifacts/ocp.version")
+    ocp += fetch_filtered_files(pr_number, "**/aws-neuron-operator-kserve-test/artifacts/ocp.version")
     operator = fetch_filtered_files(pr_number, "**/aws-neuron-operator-test/artifacts/operator.version")
+    operator += fetch_filtered_files(pr_number, "**/aws-neuron-operator-kserve-test/artifacts/operator.version")
     driver = fetch_filtered_files(pr_number, "**/aws-neuron-operator-test/artifacts/driver.version")
+    driver += fetch_filtered_files(pr_number, "**/aws-neuron-operator-kserve-test/artifacts/driver.version")
     return finished, ocp, operator, driver
 
 
@@ -213,7 +234,9 @@ def filter_neuron_finished_files(
     preferred: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     for file_item in all_finished_files:
         path = file_item.get("name", "")
-        if "aws-neuron-operator-e2e" not in path or not path.endswith("/finished.json"):
+        if not path.endswith("/finished.json"):
+            continue
+        if "aws-neuron-operator-e2e" not in path and "aws-neuron-operator-kserve-e2e" not in path:
             continue
         if "/artifacts/" in path:
             continue
@@ -287,7 +310,9 @@ def process_single_build(
             logger.info(f"Overriding job status to SUCCESS (test step passed, job failed in cleanup)")
             status = STATUS_SUCCESS
 
+    is_kserve = "kserve-e2e" in job_name
     kmm_status = get_kmm_test_step_status(base_path) or "N/A"
+    kserve_status = get_kserve_test_step_status(base_path) or "N/A" if is_kserve else "N/A"
 
     ocp_exact = ocp_version
     operator_ver = "unknown"
@@ -308,6 +333,7 @@ def process_single_build(
         prow_job_url=job_url,
         job_timestamp=str(timestamp),
         kmm_sanity_status=kmm_status,
+        kserve_status=kserve_status,
     )
 
 
@@ -428,12 +454,19 @@ def process_periodic_build(
             logger.info(f"Overriding periodic job status to SUCCESS (test step passed)")
             status = STATUS_SUCCESS
 
+    is_kserve = "kserve-e2e" in job_name
     kmm_status = get_kmm_test_step_status(base_path) or "N/A"
+    kserve_status = get_kserve_test_step_status(base_path) or "N/A" if is_kserve else "N/A"
 
-    # The test step name mirrors the ci-operator test name
-    test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
-    test_name = f"aws-neuron-operator-e2e-{test_step}"
-    artifact_base = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-test/artifacts"
+    if is_kserve:
+        test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
+        test_name = f"aws-neuron-operator-kserve-e2e-{test_step}"
+        step_name = "aws-neuron-operator-kserve-test"
+    else:
+        test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
+        test_name = f"aws-neuron-operator-e2e-{test_step}"
+        step_name = "aws-neuron-operator-test"
+    artifact_base = f"{base_path}/artifacts/{test_name}/{step_name}/artifacts"
 
     ocp_exact = ocp_version
     operator_ver = "unknown"
@@ -463,6 +496,7 @@ def process_periodic_build(
         prow_job_url=job_url,
         job_timestamp=str(timestamp),
         kmm_sanity_status=kmm_status,
+        kserve_status=kserve_status,
     )
 
 
@@ -526,7 +560,11 @@ def merge_tests(
     new_tests: List[Dict[str, Any]],
     existing_tests: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Merge tests keeping one result per (OCP, operator, driver) combination."""
+    """Merge tests keeping one result per (OCP, operator, driver) combination.
+
+    KServe results come from a separate Prow job. When merging, carry
+    over the kserve_status from any result that has a non-N/A value.
+    """
     by_version: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
 
     for item in existing_tests + new_tests:
@@ -544,6 +582,15 @@ def merge_tests(
             chosen = max(successes, key=lambda r: int(r.get("job_timestamp", "0")))
         else:
             chosen = max(version_results, key=lambda r: int(r.get("job_timestamp", "0")))
+
+        kserve_candidates = [
+            r.get(KSERVE_STATUS) for r in version_results
+            if r.get(KSERVE_STATUS) and r.get(KSERVE_STATUS) != "N/A"
+        ]
+        if kserve_candidates and chosen.get(KSERVE_STATUS, "N/A") == "N/A":
+            chosen = dict(chosen)
+            chosen[KSERVE_STATUS] = kserve_candidates[-1]
+
         final.append(chosen)
 
     final.sort(key=lambda x: int(x.get("job_timestamp", "0")), reverse=True)
