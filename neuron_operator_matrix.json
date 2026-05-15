@@ -3,6 +3,16 @@
         "notes": [],
         "tests": [
             {
+                "ocp_full_version": "4.20",
+                "neuron_operator_version": "unknown",
+                "neuron_driver_version": "unknown",
+                "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-kserve-e2e-weekly/2055166560267407360",
+                "job_timestamp": "1778831550",
+                "kmm_sanity_status": "N/A",
+                "kserve_status": "N/A"
+            },
+            {
                 "ocp_full_version": "4.20.19",
                 "neuron_operator_version": "1.1.4",
                 "neuron_driver_version": "2.25.4.0",
@@ -63,14 +73,6 @@
                 "job_timestamp": "1774545191"
             },
             {
-                "ocp_full_version": "4.20",
-                "neuron_operator_version": "unknown",
-                "neuron_driver_version": "unknown",
-                "test_status": "FAILURE",
-                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e-weekly/2035960003415773184",
-                "job_timestamp": "1774260756"
-            },
-            {
                 "ocp_full_version": "4.20.16",
                 "neuron_operator_version": "2.24.23.0",
                 "neuron_driver_version": "2.24.7.0",
@@ -81,6 +83,7 @@
         ],
         "job_history_links": [
             "https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e-weekly",
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-kserve-e2e-weekly",
             "https://prow.ci.openshift.org/job-history/gs/test-platform-results/pr-logs/directory/pull-ci-rh-ecosystem-edge-neuron-ci-main-4.20-stable-aws-neuron-operator-e2e"
         ]
     },
