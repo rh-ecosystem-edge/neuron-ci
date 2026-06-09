@@ -243,6 +243,16 @@
         "notes": [],
         "tests": [
             {
+                "ocp_full_version": "4.21.17",
+                "neuron_operator_version": "1.1.4",
+                "neuron_driver_version": "2.25.4.0",
+                "test_status": "SUCCESS",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.21-stable-aws-neuron-operator-e2e-weekly/2064226162816585728",
+                "job_timestamp": "1780994785",
+                "kmm_sanity_status": "FAILURE",
+                "kserve_status": "N/A"
+            },
+            {
                 "ocp_full_version": "4.21",
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "unknown",
