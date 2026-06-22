@@ -138,8 +138,8 @@ spec:
 def create_device_config(
     oc: OcRunner,
     *,
-    drivers_image: str,
-    driver_version: str,
+    drivers_image: str = "",
+    driver_version: str = "",
     device_plugin_image: str,
     node_metrics_image: str,
     scheduler_image: str = "",
@@ -148,12 +148,22 @@ def create_device_config(
     """Create the DeviceConfig CR.
 
     Matches eco-gotests neuronhelpers/config.go CreateDeviceConfigFromEnv().
+    When drivers_image is empty, the field is omitted so the operator
+    builds the driver image in-cluster via KMM.
     """
     r = oc.run("get", "DeviceConfig", DEVICE_CONFIG_NAME,
                "-n", NAMESPACE_NEURON, timeout=10)
     if r.returncode == 0:
         print("  DeviceConfig already exists")
         return
+
+    drivers_block = ""
+    if drivers_image:
+        drivers_block = f"  driversImage: {drivers_image}\n"
+
+    driver_version_block = ""
+    if driver_version:
+        driver_version_block = f'  driverVersion: "{driver_version}"\n'
 
     scheduler_block = ""
     if scheduler_image and scheduler_extension_image:
@@ -162,7 +172,8 @@ def create_device_config(
   schedulerExtensionImage: {scheduler_extension_image}
 """
 
-    print("  Creating DeviceConfig")
+    mode = "in-cluster build" if not drivers_image else "pre-built image"
+    print(f"  Creating DeviceConfig ({mode})")
     oc.apply_stdin(f"""\
 apiVersion: {DEVICE_CONFIG_API_VERSION}
 kind: DeviceConfig
@@ -170,9 +181,7 @@ metadata:
   name: {DEVICE_CONFIG_NAME}
   namespace: {NAMESPACE_NEURON}
 spec:
-  driversImage: {drivers_image}
-  driverVersion: "{driver_version}"
-  devicePluginImage: {device_plugin_image}
+{drivers_block}{driver_version_block}  devicePluginImage: {device_plugin_image}
   nodeMetricsImage: {node_metrics_image}
 {scheduler_block}  selector:
     {NFD_LABEL_KEY}: "{NFD_LABEL_VALUE}"
