@@ -140,7 +140,9 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
     wait_for_user_workload_monitoring(oc)
 
     # Steps 8-9: Create DeviceConfig, wait for device plugin
-    if config.drivers_image and config.driver_version and config.device_plugin_image:
+    # device_plugin_image is always required; drivers_image is optional
+    # (when empty, the operator builds the driver in-cluster via KMM)
+    if config.device_plugin_image:
         create_device_config(
             oc,
             drivers_image=config.drivers_image,
@@ -152,7 +154,7 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
         )
         wait_for_device_plugin(oc, timeout=config.device_plugin_timeout)
     else:
-        print("  Skipping DeviceConfig (driver images not configured)")
+        print("  Skipping DeviceConfig (device_plugin_image not configured)")
 
     print("\n" + "=" * 60)
     print("AWS Neuron Operator installation completed successfully.")
