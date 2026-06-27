@@ -118,7 +118,37 @@
 <h1>Test Matrix: AWS Neuron Operator on Red Hat OpenShift</h1>
 <div class="toc">
 <strong>OpenShift Versions</strong>
-<a href="#ocp-4.21">4.21</a>, <a href="#ocp-4.20">4.20</a>, <a href="#ocp-4.19">4.19</a>
+<a href="#ocp-4.22">4.22</a>, <a href="#ocp-4.21">4.21</a>, <a href="#ocp-4.20">4.20</a>, <a href="#ocp-4.19">4.19</a>
+</div>
+<div class="section" id="ocp-4.22">
+<h2>OpenShift 4.22</h2>
+
+<table id="table-4.22">
+<tr>
+<th onclick="sortTable(0, 'table-4.22')">OpenShift</th>
+<th>AWS Neuron Operator</th>
+<th>Status</th>
+<th>KMM Sanity</th>
+<th>KServe</th>
+<th onclick="sortTable(5, 'table-4.22')">Timestamp</th>
+</tr>
+<tr>
+<td>4.22.1</td>
+<td><a class="success" href="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.22-stable-aws-neuron-operator-e2e-weekly/2070749206712160256">1.2.0 (driver 2.27.4.0)</a></td>
+<td><span class="status-success">&#10004; Passed</span></td>
+<td><span class="status-success">&#10004; Passed</span></td>
+<td><span class="timestamp">N/A</span></td>
+<td><span class="timestamp">2026-06-27 09:17:35 UTC</span></td>
+</tr>
+
+</table>
+<div style="margin-top: 12px;">
+<strong>Job History</strong> <span class="timestamp">Latest: 2026-06-27 09:17:35 UTC</span>
+<div class="job-history">
+<a href="https://prow.ci.openshift.org/view/gs/test-platform-results/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.22-stable-aws-neuron-operator-e2e-weekly/2070749206712160256" class="job-square success" title="Status: SUCCESS | Driver: 2.27.4.0 | 2026-06-27 09:17:35 UTC"></a>
+</div>
+</div>
+
 </div>
 <div class="section" id="ocp-4.21">
 <h2>OpenShift 4.21</h2>
@@ -578,7 +608,7 @@
 
 </div>
 <div class="footer">
-Last updated: 2026-06-26 14:12:46 UTC
+Last updated: 2026-06-27 13:19:26 UTC
 </div>
 <script>
 function sortTable(column, tableId) {
