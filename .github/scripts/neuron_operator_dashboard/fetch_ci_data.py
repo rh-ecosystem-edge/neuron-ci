@@ -11,6 +11,7 @@ import os
 import re
 import urllib.parse
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Set
 
 import requests
@@ -556,27 +557,38 @@ def process_closed_prs(results_by_ocp: Dict[str, Dict[str, Any]]) -> None:
         process_tests_for_pr(pr_number, results_by_ocp)
 
 
+def _timestamp_to_date(ts: str) -> str:
+    try:
+        dt = datetime.fromtimestamp(int(ts), tz=timezone.utc)
+        return dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError, OSError):
+        return "unknown"
+
+
 def merge_tests(
     new_tests: List[Dict[str, Any]],
     existing_tests: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Merge tests keeping one result per (OCP, operator, driver) combination.
+    """Merge tests keeping one result per (OCP, operator, driver, date).
 
-    KServe results come from a separate Prow job. When merging, carry
-    over the kserve_status from any result that has a non-N/A value.
+    The date component ensures that runs on different days are preserved
+    as separate entries, while same-day e2e + KServe results still merge
+    so the kserve_status is carried over.
     """
-    by_version: Dict[Tuple[str, str, str], List[Dict[str, Any]]] = {}
+    by_key: Dict[Tuple[str, str, str, str], List[Dict[str, Any]]] = {}
 
     for item in existing_tests + new_tests:
+        date_str = _timestamp_to_date(item.get("job_timestamp", "0"))
         key = (
             item.get(OCP_FULL_VERSION, ""),
             item.get(NEURON_OPERATOR_VERSION, ""),
             item.get(NEURON_DRIVER_VERSION, ""),
+            date_str,
         )
-        by_version.setdefault(key, []).append(item)
+        by_key.setdefault(key, []).append(item)
 
     final: List[Dict[str, Any]] = []
-    for version_results in by_version.values():
+    for version_results in by_key.values():
         successes = [r for r in version_results if r.get("test_status") == STATUS_SUCCESS]
         if successes:
             chosen = max(successes, key=lambda r: int(r.get("job_timestamp", "0")))
