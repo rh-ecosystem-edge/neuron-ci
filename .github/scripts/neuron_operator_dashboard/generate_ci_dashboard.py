@@ -67,42 +67,22 @@ def generate_test_matrix(ocp_data: Dict[str, Dict[str, Any]]) -> str:
 
 
 def build_table_rows(results: List[Dict[str, Any]]) -> str:
-    grouped: Dict[str, List[Dict[str, Any]]] = {}
-    for r in results:
-        ocp_full = r.get(OCP_FULL_VERSION, "unknown")
-        grouped.setdefault(ocp_full, []).append(r)
-
-    selected_rows: List[Dict[str, Any]] = []
-    for ocp_full, rows in grouped.items():
-        version_groups: Dict[str, List[Dict[str, Any]]] = {}
-        for row in rows:
-            ver_key = row.get(NEURON_OPERATOR_VERSION, "unknown")
-            version_groups.setdefault(ver_key, []).append(row)
-
-        for ver, ver_results in version_groups.items():
-            has_success = any(r["test_status"] == "SUCCESS" for r in ver_results)
-            if has_success:
-                chosen = max(
-                    [r for r in ver_results if r["test_status"] == "SUCCESS"],
-                    key=lambda r: int(r.get("job_timestamp", "0")),
-                )
-            else:
-                chosen = max(ver_results, key=lambda r: int(r.get("job_timestamp", "0")))
-            selected_rows.append({"ocp_full": ocp_full, "ver": ver, "chosen": chosen})
-
-    selected_rows.sort(key=lambda r: int(r["chosen"].get("job_timestamp", "0")), reverse=True)
+    sorted_results = sorted(
+        results,
+        key=lambda r: int(r.get("job_timestamp", "0")),
+        reverse=True,
+    )
 
     rows_html = ""
-    for entry in selected_rows:
-        ocp_full = entry["ocp_full"]
-        chosen = entry["chosen"]
-        label = entry["ver"]
-        driver = chosen.get(NEURON_DRIVER_VERSION, "")
+    for r in sorted_results:
+        ocp_full = r.get(OCP_FULL_VERSION, "unknown")
+        label = r.get(NEURON_OPERATOR_VERSION, "unknown")
+        driver = r.get(NEURON_DRIVER_VERSION, "")
         if driver and driver != "unknown":
             label = f"{label} (driver {driver})"
-        url = chosen.get("prow_job_url", "#")
-        status = chosen.get("test_status", "FAILURE")
-        timestamp = ts_to_str(chosen.get("job_timestamp", "0"))
+        url = r.get("prow_job_url", "#")
+        status = r.get("test_status", "FAILURE")
+        timestamp = ts_to_str(r.get("job_timestamp", "0"))
 
         if status == "SUCCESS":
             link_class = "success"
@@ -111,7 +91,7 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
             link_class = "failed"
             status_html = '<span class="status-failure">&#10008; Failed</span>'
 
-        kmm_status = chosen.get(KMM_SANITY_STATUS, "N/A")
+        kmm_status = r.get(KMM_SANITY_STATUS, "N/A")
         if kmm_status == "SUCCESS":
             kmm_html = '<span class="status-success">&#10004; Passed</span>'
         elif kmm_status == "FAILURE":
@@ -119,7 +99,7 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
         else:
             kmm_html = '<span class="timestamp">N/A</span>'
 
-        kserve_val = chosen.get(KSERVE_STATUS, "N/A")
+        kserve_val = r.get(KSERVE_STATUS, "N/A")
         if kserve_val == "SUCCESS":
             kserve_html = '<span class="status-success">&#10004; Passed</span>'
         elif kserve_val == "FAILURE":
