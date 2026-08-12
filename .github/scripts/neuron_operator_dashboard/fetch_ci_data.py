@@ -9,6 +9,7 @@ import argparse
 import json
 import os
 import re
+import time
 import urllib.parse
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -52,16 +53,39 @@ PERIODIC_JOB_GCS_PREFIX = "logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-"
 GCS_MAX_RESULTS_PER_REQUEST = 1000
 
 
+GCS_RETRY_MAX_ATTEMPTS = 5
+GCS_RETRY_INITIAL_DELAY = 2.0
+
+
+def _request_with_retry(method, *args, **kwargs) -> requests.Response:
+    """Execute an HTTP request with exponential backoff on 429 responses."""
+    delay = GCS_RETRY_INITIAL_DELAY
+    for attempt in range(1, GCS_RETRY_MAX_ATTEMPTS + 1):
+        response = method(*args, **kwargs)
+        if response.status_code != 429:
+            return response
+        if attempt == GCS_RETRY_MAX_ATTEMPTS:
+            logger.warning(f"Rate limited after {GCS_RETRY_MAX_ATTEMPTS} retries, giving up")
+            return response
+        retry_after = response.headers.get("Retry-After")
+        wait = float(retry_after) if retry_after else delay
+        logger.info(f"Rate limited (429), retrying in {wait:.1f}s (attempt {attempt}/{GCS_RETRY_MAX_ATTEMPTS})")
+        time.sleep(wait)
+        delay *= 2
+    return response
+
+
 def http_get_json(url: str, params: Dict[str, Any] | None = None,
                   headers: Dict[str, str] | None = None) -> Dict[str, Any]:
-    response = requests.get(url, params=params, headers=headers, timeout=30)
+    response = _request_with_retry(requests.get, url, params=params, headers=headers, timeout=30)
     response.raise_for_status()
     return response.json()
 
 
 def fetch_gcs_file_content(file_path: str) -> str:
     logger.info(f"Fetching file content for {file_path}")
-    response = requests.get(
+    response = _request_with_retry(
+        requests.get,
         url=f"{GCS_API_BASE_URL}/{urllib.parse.quote_plus(file_path)}",
         params={"alt": "media"},
         timeout=30,
