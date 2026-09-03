@@ -25,6 +25,7 @@ def install_operator(
     operator_group_name: str,
     subscription_name: str,
     target_namespaces: list[str] | None = None,
+    starting_csv: str = "",
     timeout: int = 600,
 ) -> None:
     """Install an operator via OLM.
@@ -40,8 +41,9 @@ def install_operator(
     _create_operator_group(oc, namespace, operator_group_name, target_namespaces)
     _create_subscription(
         oc, namespace, subscription_name, package_name, catalog_source, channel,
+        starting_csv,
     )
-    _wait_for_csv(oc, namespace, package_name, timeout)
+    _wait_for_csv(oc, namespace, package_name, timeout, starting_csv)
 
     print(f"--- {package_name} installed successfully ---\n")
 
@@ -101,13 +103,22 @@ def _create_subscription(
     package_name: str,
     catalog_source: str,
     channel: str,
+    starting_csv: str,
 ) -> None:
     r = oc.run("get", "subscription", name, "-n", namespace, timeout=10)
     if r.returncode == 0:
         print(f"  Subscription {name} already exists")
         return
 
-    print(f"  Creating Subscription {name} (channel={channel}, source={catalog_source})")
+    starting_csv_block = ""
+    if starting_csv:
+        starting_csv_block = f"  startingCSV: {starting_csv}\n"
+
+    pin_description = f", startingCSV={starting_csv}" if starting_csv else ""
+    print(
+        f"  Creating Subscription {name} "
+        f"(channel={channel}, source={catalog_source}{pin_description})"
+    )
     oc.apply_stdin(f"""\
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -120,7 +131,7 @@ spec:
   name: {package_name}
   source: {catalog_source}
   sourceNamespace: {CATALOG_NAMESPACE}
-""")
+{starting_csv_block}""")
 
 
 def _wait_for_csv(
@@ -128,6 +139,7 @@ def _wait_for_csv(
     namespace: str,
     package_name: str,
     timeout: int,
+    expected_csv: str = "",
 ) -> None:
     """Wait for the ClusterServiceVersion to reach Succeeded phase."""
     print(f"  Waiting for {package_name} CSV to succeed (timeout={timeout}s)...")
@@ -156,7 +168,12 @@ def _wait_for_csv(
             csv_name = item.get("metadata", {}).get("name", "")
             phase = item.get("status", {}).get("phase", "")
 
-            if package_name in csv_name:
+            csv_matches = (
+                csv_name == expected_csv
+                if expected_csv
+                else package_name in csv_name
+            )
+            if csv_matches:
                 if phase == "Succeeded":
                     print(f"    CSV {csv_name} is Succeeded")
                     return

@@ -19,6 +19,7 @@ from neuron_operator_dashboard.fetch_ci_data import (
     NEURON_DRIVER_VERSION,
     KMM_SANITY_STATUS,
     KSERVE_STATUS,
+    DRA_STATUS,
     STATUS_ABORTED,
 )
 
@@ -107,12 +108,21 @@ def build_table_rows(results: List[Dict[str, Any]]) -> str:
         else:
             kserve_html = '<span class="timestamp">N/A</span>'
 
+        dra_val = r.get(DRA_STATUS, "N/A")
+        if dra_val == "SUCCESS":
+            dra_html = '<span class="status-success">&#10004; Passed</span>'
+        elif dra_val == "FAILURE":
+            dra_html = '<span class="status-failure">&#10008; Failed</span>'
+        else:
+            dra_html = '<span class="timestamp">N/A</span>'
+
         rows_html += f"""<tr>
 <td>{ocp_full}</td>
 <td><a class="{link_class}" href="{url}">{label}</a></td>
 <td>{status_html}</td>
 <td>{kmm_html}</td>
 <td>{kserve_html}</td>
+<td>{dra_html}</td>
 <td><span class="timestamp">{timestamp}</span></td>
 </tr>
 """

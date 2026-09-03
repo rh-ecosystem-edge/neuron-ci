@@ -26,6 +26,10 @@ from operators.config import (
     enable_user_workload_monitoring,
 )
 from operators.constants import (
+    DRA_KMM_CHANNEL,
+    DRA_KMM_STARTING_CSV,
+    DRA_NEURON_CHANNEL,
+    DRA_NEURON_STARTING_CSV,
     KMM_CATALOG,
     KMM_CHANNEL,
     KMM_OPERATOR_GROUP,
@@ -47,6 +51,8 @@ from operators.constants import (
 )
 from operators.install import install_operator
 from operators.wait import (
+    wait_for_dra_driver,
+    wait_for_dra_resources,
     wait_for_device_plugin,
     wait_for_neuron_node_labels,
     wait_for_nfd_workers,
@@ -67,12 +73,14 @@ class NeuronInstallConfig:
     node_metrics_image: str = ""
     scheduler_image: str = ""
     scheduler_extension_image: str = ""
+    dra_driver_image: str = ""
 
     # Timeouts (seconds)
     operator_timeout: int = 600
     nfd_workers_timeout: int = 300
     node_label_timeout: int = 300
     device_plugin_timeout: int = 600
+    dra_timeout: int = 600
 
 
 def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
@@ -85,6 +93,10 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
     print("\n" + "=" * 60)
     print("AWS Neuron Operator & Dependencies Installation (OLM)")
     print("=" * 60)
+
+    dra_mode = bool(config.dra_driver_image)
+    if dra_mode:
+        print("Installation mode: DRA")
 
     # Step 0: Enable user workload monitoring (needed for metrics scraping).
     # Done early so the monitoring pods can start while operators install.
@@ -113,9 +125,10 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
         namespace=NAMESPACE_KMM,
         package_name=KMM_PACKAGE,
         catalog_source=KMM_CATALOG,
-        channel=KMM_CHANNEL,
+        channel=DRA_KMM_CHANNEL if dra_mode else KMM_CHANNEL,
         operator_group_name=KMM_OPERATOR_GROUP,
         subscription_name=KMM_SUBSCRIPTION,
+        starting_csv=DRA_KMM_STARTING_CSV if dra_mode else "",
         timeout=config.operator_timeout,
     )
 
@@ -125,9 +138,10 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
         namespace=NAMESPACE_NEURON,
         package_name=NEURON_PACKAGE,
         catalog_source=NEURON_CATALOG,
-        channel=NEURON_CHANNEL,
+        channel=DRA_NEURON_CHANNEL if dra_mode else NEURON_CHANNEL,
         operator_group_name=NEURON_OPERATOR_GROUP,
         subscription_name=NEURON_SUBSCRIPTION,
+        starting_csv=DRA_NEURON_STARTING_CSV if dra_mode else "",
         timeout=config.operator_timeout,
     )
 
@@ -139,10 +153,9 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
     # so Prometheus is scraping by the time the metrics tests run.
     wait_for_user_workload_monitoring(oc)
 
-    # Steps 8-9: Create DeviceConfig, wait for device plugin
-    # device_plugin_image is always required; drivers_image is optional
-    # (when empty, the operator builds the driver in-cluster via KMM)
-    if config.device_plugin_image:
+    # Steps 8-9: Create DeviceConfig and wait for the selected allocation mode.
+    # drivers_image is optional when the operator builds the driver in-cluster.
+    if config.device_plugin_image or config.dra_driver_image:
         create_device_config(
             oc,
             drivers_image=config.drivers_image,
@@ -151,10 +164,15 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
             node_metrics_image=config.node_metrics_image,
             scheduler_image=config.scheduler_image,
             scheduler_extension_image=config.scheduler_extension_image,
+            dra_driver_image=config.dra_driver_image,
         )
-        wait_for_device_plugin(oc, timeout=config.device_plugin_timeout)
+        if dra_mode:
+            wait_for_dra_driver(oc, timeout=config.dra_timeout)
+            wait_for_dra_resources(oc, timeout=config.dra_timeout)
+        else:
+            wait_for_device_plugin(oc, timeout=config.device_plugin_timeout)
     else:
-        print("  Skipping DeviceConfig (device_plugin_image not configured)")
+        print("  Skipping DeviceConfig (no device plugin or DRA driver configured)")
 
     print("\n" + "=" * 60)
     print("AWS Neuron Operator installation completed successfully.")

@@ -10,6 +10,9 @@ import time
 from typing import TYPE_CHECKING
 
 from operators.constants import (
+    DRA_DAEMONSET_PREFIX,
+    DRA_DEVICE_CLASS_NAME,
+    DRA_DRIVER_NAME,
     DEVICE_PLUGIN_PREFIX,
     NAMESPACE_KMM,
     NAMESPACE_NFD,
@@ -198,6 +201,98 @@ def wait_for_device_plugin(oc: OcRunner, timeout: int = 600) -> None:
     _dump_diagnostics(oc)
     raise RuntimeError(
         f"Neuron device plugin DaemonSet did not become ready within {timeout}s"
+    )
+
+
+def wait_for_dra_driver(oc: OcRunner, timeout: int = 600) -> None:
+    """Wait for the Neuron DRA DaemonSet to be fully ready."""
+    print(f"  Waiting for Neuron DRA DaemonSet (timeout={timeout}s)...")
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        elapsed = int(time.monotonic() + timeout - deadline)
+        r = oc.run(
+            "get", "daemonsets", "-n", NAMESPACE_NEURON,
+            "-o", "json", timeout=15,
+        )
+        if r.returncode != 0:
+            time.sleep(10)
+            continue
+
+        try:
+            data = json.loads(r.stdout or "{}")
+        except json.JSONDecodeError:
+            time.sleep(10)
+            continue
+
+        for ds in data.get("items", []):
+            name = ds.get("metadata", {}).get("name", "")
+            if not name.startswith(DRA_DAEMONSET_PREFIX):
+                continue
+
+            status = ds.get("status", {})
+            ready = status.get("numberReady", 0)
+            desired = status.get("desiredNumberScheduled", 0)
+            if desired > 0 and ready == desired:
+                print(f"    DRA DaemonSet {name} ready: {ready}/{desired}")
+                return
+
+            print(f"    DRA DaemonSet {name}: {ready}/{desired} ({elapsed}s)...")
+            break
+
+        time.sleep(10)
+
+    _dump_diagnostics(oc)
+    raise RuntimeError(f"Neuron DRA DaemonSet did not become ready within {timeout}s")
+
+
+def wait_for_dra_resources(oc: OcRunner, timeout: int = 600) -> None:
+    """Wait for the Neuron DeviceClass and at least one populated ResourceSlice."""
+    print(f"  Waiting for Neuron DRA resources (timeout={timeout}s)...")
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        elapsed = int(time.monotonic() + timeout - deadline)
+        device_class = oc.run(
+            "get", "deviceclass", DRA_DEVICE_CLASS_NAME,
+            "-o", "name", timeout=15,
+        )
+        slices = oc.run("get", "resourceslices", "-o", "json", timeout=15)
+
+        matching_slices = []
+        if slices.returncode == 0:
+            try:
+                data = json.loads(slices.stdout or "{}")
+                matching_slices = [
+                    item for item in data.get("items", [])
+                    if item.get("spec", {}).get("driver") == DRA_DRIVER_NAME
+                    and item.get("spec", {}).get("devices")
+                ]
+            except json.JSONDecodeError:
+                matching_slices = []
+
+        if device_class.returncode == 0 and matching_slices:
+            device_count = sum(
+                len(item.get("spec", {}).get("devices", []))
+                for item in matching_slices
+            )
+            print(
+                f"    DeviceClass {DRA_DEVICE_CLASS_NAME} and "
+                f"{len(matching_slices)} ResourceSlice(s) ready "
+                f"({device_count} device(s))"
+            )
+            return
+
+        print(
+            f"    DRA resources not ready: deviceClass="
+            f"{'yes' if device_class.returncode == 0 else 'no'}, "
+            f"resourceSlices={len(matching_slices)} ({elapsed}s)..."
+        )
+        time.sleep(10)
+
+    _dump_diagnostics(oc)
+    raise RuntimeError(
+        f"Neuron DeviceClass/ResourceSlices did not become ready within {timeout}s"
     )
 
 
