@@ -1,5 +1,6 @@
 FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
 LABEL maintainer="rh-ecosystem-edge"
+LABEL description="Neuron CI operator installer and test runner"
 
 RUN microdnf install -y python3 python3-pip tar gzip jq make && \
     microdnf clean all
