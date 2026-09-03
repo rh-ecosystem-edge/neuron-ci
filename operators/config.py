@@ -140,10 +140,11 @@ def create_device_config(
     *,
     drivers_image: str = "",
     driver_version: str = "",
-    device_plugin_image: str,
-    node_metrics_image: str,
+    device_plugin_image: str = "",
+    node_metrics_image: str = "",
     scheduler_image: str = "",
     scheduler_extension_image: str = "",
+    dra_driver_image: str = "",
 ) -> None:
     """Create the DeviceConfig CR.
 
@@ -161,19 +162,30 @@ def create_device_config(
     if drivers_image:
         drivers_block = f"  driversImage: {drivers_image}\n"
 
+    # The v1.3.0 release sample no longer sets driverVersion for pre-built
+    # images. Keep it only for the in-cluster build path, where KMM needs the
+    # version to build and tag the kernel driver image.
     driver_version_block = ""
-    if driver_version:
+    if driver_version and not drivers_image:
         driver_version_block = f'  driverVersion: "{driver_version}"\n'
 
-    scheduler_block = ""
-    if scheduler_image and scheduler_extension_image:
-        scheduler_block = f"""\
+    workload_block = ""
+    if dra_driver_image:
+        workload_block = (
+            "  useInTreeDrivers: false\n"
+            f"  draDriverImage: {dra_driver_image}\n"
+        )
+    else:
+        workload_block = f"  devicePluginImage: {device_plugin_image}\n"
+        if scheduler_image and scheduler_extension_image:
+            workload_block += f"""\
   customSchedulerImage: {scheduler_image}
   schedulerExtensionImage: {scheduler_extension_image}
 """
 
-    mode = "in-cluster build" if not drivers_image else "pre-built image"
-    print(f"  Creating DeviceConfig ({mode})")
+    driver_mode = "in-cluster build" if not drivers_image else "pre-built image"
+    allocation_mode = "DRA" if dra_driver_image else "device plugin"
+    print(f"  Creating DeviceConfig ({allocation_mode}, {driver_mode})")
     oc.apply_stdin(f"""\
 apiVersion: {DEVICE_CONFIG_API_VERSION}
 kind: DeviceConfig
@@ -181,9 +193,9 @@ metadata:
   name: {DEVICE_CONFIG_NAME}
   namespace: {NAMESPACE_NEURON}
 spec:
-{drivers_block}{driver_version_block}  devicePluginImage: {device_plugin_image}
+{drivers_block}{driver_version_block}{workload_block}\
   nodeMetricsImage: {node_metrics_image}
-{scheduler_block}  selector:
+  selector:
     {NFD_LABEL_KEY}: "{NFD_LABEL_VALUE}"
 """)
 

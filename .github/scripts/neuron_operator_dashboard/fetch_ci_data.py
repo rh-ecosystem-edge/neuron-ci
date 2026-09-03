@@ -26,6 +26,7 @@ NEURON_OPERATOR_VERSION = "neuron_operator_version"
 NEURON_DRIVER_VERSION = "neuron_driver_version"
 KMM_SANITY_STATUS = "kmm_sanity_status"
 KSERVE_STATUS = "kserve_status"
+DRA_STATUS = "dra_status"
 
 STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILURE = "FAILURE"
@@ -37,14 +38,14 @@ GCS_API_BASE_URL = "https://storage.googleapis.com/storage/v1/b/test-platform-re
 TEST_RESULT_PATH_REGEX = re.compile(
     r"pr-logs/pull/(?P<repo>[^/]+)/(?P<pr_number>\d+)/"
     r"(?P<job_name>(?:rehearse-\d+-)?pull-ci-rh-ecosystem-edge-neuron-ci-main-"
-    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-(?P<job_type>kserve-)?e2e(?P<job_suffix>[^/]*))"
+    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-(?P<job_type>(?:kserve-|dra-))?e2e(?P<job_suffix>[^/]*))"
     r"/(?P<build_id>[^/]+)"
 )
 
 # Matches periodic job paths.
 PERIODIC_RESULT_PATH_REGEX = re.compile(
     r"logs/(?P<job_name>periodic-ci-rh-ecosystem-edge-neuron-ci-main-"
-    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-(?P<job_type>kserve-)?e2e(?P<job_suffix>[^/]*))"
+    r"(?P<ocp_version>\d+\.\d+)-stable-aws-neuron-operator-(?P<job_type>(?:kserve-|dra-))?e2e(?P<job_suffix>[^/]*))"
     r"/(?P<build_id>\d+)"
 )
 
@@ -122,9 +123,17 @@ def get_test_step_status(base_path: str) -> Optional[str]:
     deletion) even when all tests passed.  The test step has its own
     finished.json under artifacts/ whose result reflects only the tests.
     """
-    for test_name in ("aws-neuron-operator-e2e", "aws-neuron-operator-e2e-weekly",
-                      "aws-neuron-operator-kserve-e2e", "aws-neuron-operator-kserve-e2e-weekly"):
-        step_name = "aws-neuron-operator-kserve-test" if "kserve" in test_name else "aws-neuron-operator-test"
+    for test_name in (
+        "aws-neuron-operator-e2e", "aws-neuron-operator-e2e-weekly",
+        "aws-neuron-operator-kserve-e2e", "aws-neuron-operator-kserve-e2e-weekly",
+        "aws-neuron-operator-dra-e2e", "aws-neuron-operator-dra-e2e-weekly",
+    ):
+        if "kserve" in test_name:
+            step_name = "aws-neuron-operator-kserve-test"
+        elif "dra" in test_name:
+            step_name = "aws-neuron-operator-dra-test"
+        else:
+            step_name = "aws-neuron-operator-test"
         path = f"{base_path}/artifacts/{test_name}/{step_name}/finished.json"
         try:
             content = fetch_gcs_file_content(path)
@@ -139,6 +148,19 @@ def get_kserve_test_step_status(base_path: str) -> Optional[str]:
     """Read the KServe test step's finished.json to get the KServe result."""
     for test_name in ("aws-neuron-operator-kserve-e2e", "aws-neuron-operator-kserve-e2e-weekly"):
         path = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-kserve-test/finished.json"
+        try:
+            content = fetch_gcs_file_content(path)
+            data = json.loads(content)
+            return data.get("result")
+        except (requests.HTTPError, json.JSONDecodeError, KeyError):
+            continue
+    return None
+
+
+def get_dra_test_step_status(base_path: str) -> Optional[str]:
+    """Read the DRA test step's finished.json to get the DRA result."""
+    for test_name in ("aws-neuron-operator-dra-e2e", "aws-neuron-operator-dra-e2e-weekly"):
+        path = f"{base_path}/artifacts/{test_name}/aws-neuron-operator-dra-test/finished.json"
         try:
             content = fetch_gcs_file_content(path)
             data = json.loads(content)
@@ -171,6 +193,7 @@ class TestResult:
     job_timestamp: str
     kmm_sanity_status: str = "N/A"
     kserve_status: str = "N/A"
+    dra_status: str = "N/A"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -182,6 +205,7 @@ class TestResult:
             "job_timestamp": self.job_timestamp,
             KMM_SANITY_STATUS: self.kmm_sanity_status,
             KSERVE_STATUS: self.kserve_status,
+            DRA_STATUS: self.dra_status,
         }
 
     def build_key(self) -> Tuple[str, str, str]:
@@ -230,10 +254,13 @@ def fetch_pr_files(pr_number: str) -> Tuple[
     finished = fetch_filtered_files(pr_number, "**/finished.json")
     ocp = fetch_filtered_files(pr_number, "**/aws-neuron-operator-test/artifacts/ocp.version")
     ocp += fetch_filtered_files(pr_number, "**/aws-neuron-operator-kserve-test/artifacts/ocp.version")
+    ocp += fetch_filtered_files(pr_number, "**/aws-neuron-operator-dra-test/artifacts/ocp.version")
     operator = fetch_filtered_files(pr_number, "**/aws-neuron-operator-test/artifacts/operator.version")
     operator += fetch_filtered_files(pr_number, "**/aws-neuron-operator-kserve-test/artifacts/operator.version")
+    operator += fetch_filtered_files(pr_number, "**/aws-neuron-operator-dra-test/artifacts/operator.version")
     driver = fetch_filtered_files(pr_number, "**/aws-neuron-operator-test/artifacts/driver.version")
     driver += fetch_filtered_files(pr_number, "**/aws-neuron-operator-kserve-test/artifacts/driver.version")
+    driver += fetch_filtered_files(pr_number, "**/aws-neuron-operator-dra-test/artifacts/driver.version")
     return finished, ocp, operator, driver
 
 
@@ -261,7 +288,11 @@ def filter_neuron_finished_files(
         path = file_item.get("name", "")
         if not path.endswith("/finished.json"):
             continue
-        if "aws-neuron-operator-e2e" not in path and "aws-neuron-operator-kserve-e2e" not in path:
+        if not any(name in path for name in (
+            "aws-neuron-operator-e2e",
+            "aws-neuron-operator-kserve-e2e",
+            "aws-neuron-operator-dra-e2e",
+        )):
             continue
         if "/artifacts/" in path:
             continue
@@ -336,8 +367,10 @@ def process_single_build(
             status = STATUS_SUCCESS
 
     is_kserve = "kserve-e2e" in job_name
+    is_dra = "dra-e2e" in job_name
     kmm_status = get_kmm_test_step_status(base_path) or "N/A"
     kserve_status = get_kserve_test_step_status(base_path) or "N/A" if is_kserve else "N/A"
+    dra_status = get_dra_test_step_status(base_path) or "N/A" if is_dra else "N/A"
 
     ocp_exact = ocp_version
     operator_ver = "unknown"
@@ -359,6 +392,7 @@ def process_single_build(
         job_timestamp=str(timestamp),
         kmm_sanity_status=kmm_status,
         kserve_status=kserve_status,
+        dra_status=dra_status,
     )
 
 
@@ -480,13 +514,19 @@ def process_periodic_build(
             status = STATUS_SUCCESS
 
     is_kserve = "kserve-e2e" in job_name
+    is_dra = "dra-e2e" in job_name
     kmm_status = get_kmm_test_step_status(base_path) or "N/A"
     kserve_status = get_kserve_test_step_status(base_path) or "N/A" if is_kserve else "N/A"
+    dra_status = get_dra_test_step_status(base_path) or "N/A" if is_dra else "N/A"
 
     if is_kserve:
         test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
         test_name = f"aws-neuron-operator-kserve-e2e-{test_step}"
         step_name = "aws-neuron-operator-kserve-test"
+    elif is_dra:
+        test_step = job_name.rsplit("-", 1)[-1]
+        test_name = f"aws-neuron-operator-dra-e2e-{test_step}"
+        step_name = "aws-neuron-operator-dra-test"
     else:
         test_step = job_name.rsplit("-", 1)[-1]  # e.g. "weekly"
         test_name = f"aws-neuron-operator-e2e-{test_step}"
@@ -522,6 +562,7 @@ def process_periodic_build(
         job_timestamp=str(timestamp),
         kmm_sanity_status=kmm_status,
         kserve_status=kserve_status,
+        dra_status=dra_status,
     )
 
 
@@ -596,8 +637,8 @@ def merge_tests(
     """Merge tests keeping one result per (OCP, operator, driver, date).
 
     The date component ensures that runs on different days are preserved
-    as separate entries, while same-day e2e + KServe results still merge
-    so the kserve_status is carried over.
+    as separate entries, while same-day standard, KServe, and DRA results
+    still merge so their specialized statuses are carried over.
     """
     by_key: Dict[Tuple[str, str, str, str], List[Dict[str, Any]]] = {}
 
@@ -626,6 +667,14 @@ def merge_tests(
         if kserve_candidates and chosen.get(KSERVE_STATUS, "N/A") == "N/A":
             chosen = dict(chosen)
             chosen[KSERVE_STATUS] = kserve_candidates[-1]
+
+        dra_candidates = [
+            r.get(DRA_STATUS) for r in version_results
+            if r.get(DRA_STATUS) and r.get(DRA_STATUS) != "N/A"
+        ]
+        if dra_candidates and chosen.get(DRA_STATUS, "N/A") == "N/A":
+            chosen = dict(chosen)
+            chosen[DRA_STATUS] = dra_candidates[-1]
 
         final.append(chosen)
 

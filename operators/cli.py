@@ -25,6 +25,7 @@ def _config_from_env() -> NeuronInstallConfig:
         node_metrics_image=os.environ.get("ECO_HWACCEL_NEURON_NODE_METRICS_IMAGE", ""),
         scheduler_image=os.environ.get("ECO_HWACCEL_NEURON_SCHEDULER_IMAGE", ""),
         scheduler_extension_image=os.environ.get("ECO_HWACCEL_NEURON_SCHEDULER_EXTENSION_IMAGE", ""),
+        dra_driver_image=os.environ.get("ECO_HWACCEL_NEURON_DRA_DRIVER_IMAGE", ""),
     )
 
 
