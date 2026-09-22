@@ -19,6 +19,15 @@ import requests
 from pydantic import BaseModel
 import semver
 
+try:
+    import google.auth
+    from google.auth.exceptions import DefaultCredentialsError
+    from google.auth.transport.requests import Request
+except ImportError:  # pragma: no cover - optional for local anonymous reads
+    google = None
+    DefaultCredentialsError = None
+    Request = None
+
 from common.utils import logger
 
 OCP_FULL_VERSION = "ocp_full_version"
@@ -52,10 +61,49 @@ PERIODIC_RESULT_PATH_REGEX = re.compile(
 PERIODIC_JOB_GCS_PREFIX = "logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-"
 
 GCS_MAX_RESULTS_PER_REQUEST = 1000
+GCS_READ_SCOPE = "https://www.googleapis.com/auth/devstorage.read_only"
+
+_gcs_credentials = None
+_gcs_credentials_warning_logged = False
 
 
 GCS_RETRY_MAX_ATTEMPTS = 5
 GCS_RETRY_INITIAL_DELAY = 2.0
+
+
+def _gcs_headers() -> Dict[str, str]:
+    """Return headers for authenticated GCS API requests.
+
+    GitHub Actions authenticates with Google via OIDC and writes an external
+    account credentials file for Application Default Credentials. Keep the
+    anonymous fallback for local development, where the bucket may be public
+    in another environment, but use ADC whenever it is available.
+    """
+    global _gcs_credentials, _gcs_credentials_warning_logged
+
+    headers = {"Accept": "application/json"}
+    if google is None:
+        return headers
+
+    if _gcs_credentials is None and not _gcs_credentials_warning_logged:
+        try:
+            _gcs_credentials, _ = google.auth.default(scopes=[GCS_READ_SCOPE])
+        except DefaultCredentialsError:
+            logger.warning(
+                "Google Application Default Credentials are unavailable; "
+                "attempting anonymous GCS access"
+            )
+            _gcs_credentials_warning_logged = True
+
+    if _gcs_credentials is None:
+        return headers
+
+    if not _gcs_credentials.valid or _gcs_credentials.expired:
+        _gcs_credentials.refresh(Request())
+
+    if _gcs_credentials.token:
+        headers["Authorization"] = f"Bearer {_gcs_credentials.token}"
+    return headers
 
 
 def _request_with_retry(method, *args, **kwargs) -> requests.Response:
@@ -89,6 +137,7 @@ def fetch_gcs_file_content(file_path: str) -> str:
         requests.get,
         url=f"{GCS_API_BASE_URL}/{urllib.parse.quote_plus(file_path)}",
         params={"alt": "media"},
+        headers=_gcs_headers(),
         timeout=30,
     )
     response.raise_for_status()
@@ -229,14 +278,15 @@ def fetch_filtered_files(pr_number: str, glob_pattern: str) -> List[Dict[str, An
         "maxResults": str(GCS_MAX_RESULTS_PER_REQUEST),
         "projection": "noAcl",
     }
-    headers = {"Accept": "application/json"}
     all_items: List[Dict[str, Any]] = []
     next_page_token = None
 
     while True:
         if next_page_token:
             params["pageToken"] = next_page_token
-        response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
+        response_data = http_get_json(
+            GCS_API_BASE_URL, params=params, headers=_gcs_headers()
+        )
         all_items.extend(response_data.get("items", []))
         next_page_token = response_data.get("nextPageToken")
         if not next_page_token:
@@ -446,8 +496,9 @@ def list_periodic_job_prefixes() -> List[str]:
         "maxResults": "100",
         "alt": "json",
     }
-    headers = {"Accept": "application/json"}
-    response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
+    response_data = http_get_json(
+        GCS_API_BASE_URL, params=params, headers=_gcs_headers()
+    )
     prefixes = response_data.get("prefixes", [])
     logger.info(f"Found {len(prefixes)} periodic job prefix(es)")
     return prefixes
@@ -461,14 +512,15 @@ def list_periodic_builds(job_prefix: str, max_builds: int = 10) -> List[str]:
         "maxResults": str(GCS_MAX_RESULTS_PER_REQUEST),
         "alt": "json",
     }
-    headers = {"Accept": "application/json"}
     all_prefixes: List[str] = []
     next_page_token = None
 
     while True:
         if next_page_token:
             params["pageToken"] = next_page_token
-        response_data = http_get_json(GCS_API_BASE_URL, params=params, headers=headers)
+        response_data = http_get_json(
+            GCS_API_BASE_URL, params=params, headers=_gcs_headers()
+        )
         all_prefixes.extend(response_data.get("prefixes", []))
         next_page_token = response_data.get("nextPageToken")
         if not next_page_token:
