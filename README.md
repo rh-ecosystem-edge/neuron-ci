@@ -25,3 +25,19 @@ make cluster-operators
 For local runs, also export the kernel driver, driver version, and metrics
 values from the desired release's `deviceconfig-sample.yaml` before invoking
 `make cluster-operators`.
+
+## Dashboard GCS access
+
+The matrix workflow reads Prow artifacts from the private
+`test-platform-results` bucket. Configure these repository variables before
+running the workflow:
+
+- `GCP_WORKLOAD_IDENTITY_PROVIDER`: the full Google Workload Identity
+  Federation provider resource name trusted by this repository
+- `GCP_SERVICE_ACCOUNT`: a Google service account granted `Storage Object
+  Viewer` on the `test-platform-results` bucket
+
+The workflow uses GitHub's OIDC token and short-lived Google credentials; no
+long-lived service-account key is stored in GitHub. The dashboard fetcher uses
+the credentials file supplied by the authentication step for both bucket
+listing and object reads.
