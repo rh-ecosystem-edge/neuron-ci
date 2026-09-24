@@ -41,7 +41,7 @@ STATUS_SUCCESS = "SUCCESS"
 STATUS_FAILURE = "FAILURE"
 STATUS_ABORTED = "ABORTED"
 
-GCS_API_BASE_URL = "https://storage.googleapis.com/storage/v1/b/test-platform-results/o"
+GCS_API_BASE_URL = "https://storage.googleapis.com/storage/v1/b/test-platform-results-public/o"
 
 # Matches both presubmit and rehearsal job paths for neuron-ci.
 TEST_RESULT_PATH_REGEX = re.compile(
@@ -148,7 +148,7 @@ def build_prow_job_url(finished_json_path: str) -> str:
     directory_path = finished_json_path[: -len("/finished.json")]
     return (
         "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com"
-        f"/gcs/test-platform-results/{directory_path}"
+        f"/gcs/test-platform-results-public/{directory_path}"
     )
 
 
@@ -478,7 +478,7 @@ def process_tests_for_pr(
         results_by_ocp.setdefault(ocp_version, {"tests": [], "job_history_links": set()})
 
         job_history_url = (
-            "https://prow.ci.openshift.org/job-history/gs/test-platform-results"
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results-public"
             f"/pr-logs/directory/{job_name}"
         )
         results_by_ocp[ocp_version]["job_history_links"].add(job_history_url)
@@ -554,7 +554,7 @@ def process_periodic_build(
     status = finished_data.get("result", STATUS_ABORTED)
     timestamp = finished_data.get("timestamp", 0)
     job_url = (
-        f"https://prow.ci.openshift.org/view/gs/test-platform-results"
+        f"https://prow.ci.openshift.org/view/gs/test-platform-results-public"
         f"/logs/{job_name}/{build_id}"
     )
 
@@ -642,7 +642,7 @@ def process_periodic_tests(
         results_by_ocp.setdefault(ocp_version, {"tests": [], "job_history_links": set()})
 
         job_history_url = (
-            "https://prow.ci.openshift.org/job-history/gs/test-platform-results"
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results-public"
             f"/logs/{job_name}"
         )
         results_by_ocp[ocp_version]["job_history_links"].add(job_history_url)
