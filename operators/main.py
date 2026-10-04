@@ -27,7 +27,6 @@ from operators.config import (
 )
 from operators.constants import (
     DRA_KMM_CHANNEL,
-    DRA_KMM_STARTING_CSV,
     DRA_NEURON_CHANNEL,
     DRA_NEURON_STARTING_CSV,
     KMM_CATALOG,
@@ -128,7 +127,6 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
         channel=DRA_KMM_CHANNEL if dra_mode else KMM_CHANNEL,
         operator_group_name=KMM_OPERATOR_GROUP,
         subscription_name=KMM_SUBSCRIPTION,
-        starting_csv=DRA_KMM_STARTING_CSV if dra_mode else "",
         timeout=config.operator_timeout,
     )
 

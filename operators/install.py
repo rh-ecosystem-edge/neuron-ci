@@ -43,7 +43,14 @@ def install_operator(
         oc, namespace, subscription_name, package_name, catalog_source, channel,
         starting_csv,
     )
-    _wait_for_csv(oc, namespace, package_name, timeout, starting_csv)
+    _wait_for_csv(
+        oc,
+        namespace,
+        package_name,
+        timeout,
+        expected_csv=starting_csv,
+        subscription_name=subscription_name,
+    )
 
     print(f"--- {package_name} installed successfully ---\n")
 
@@ -140,8 +147,15 @@ def _wait_for_csv(
     package_name: str,
     timeout: int,
     expected_csv: str = "",
+    subscription_name: str = "",
 ) -> None:
-    """Wait for the ClusterServiceVersion to reach Succeeded phase."""
+    """Wait for the selected ClusterServiceVersion to reach Succeeded.
+
+    When a starting CSV is not pinned, OLM selects the newest CSV available
+    in the Subscription channel. Follow ``status.currentCSV`` rather than
+    guessing from the CSV list, since the initially selected CSV may be
+    replaced while the catalog is resolving an update.
+    """
     print(f"  Waiting for {package_name} CSV to succeed (timeout={timeout}s)...")
     deadline = time.monotonic() + timeout
 
@@ -164,21 +178,42 @@ def _wait_for_csv(
             time.sleep(10)
             continue
 
+        selected_csv = expected_csv
+        if not selected_csv and subscription_name:
+            subscription = oc.run(
+                "get", "subscription", subscription_name,
+                "-n", namespace,
+                "-o", "jsonpath={.status.currentCSV}",
+                timeout=30,
+            )
+            selected_csv = (subscription.stdout or "").strip()
+
+            if not selected_csv:
+                print(
+                    f"    Subscription {subscription_name} has not selected a CSV yet "
+                    f"({elapsed}s)..."
+                )
+                time.sleep(10)
+                continue
+
+        matching_csv = None
         for item in data.get("items", []):
             csv_name = item.get("metadata", {}).get("name", "")
-            phase = item.get("status", {}).get("phase", "")
-
-            csv_matches = (
-                csv_name == expected_csv
-                if expected_csv
-                else package_name in csv_name
-            )
+            if selected_csv:
+                csv_matches = csv_name == selected_csv
+            else:
+                csv_matches = package_name in csv_name
             if csv_matches:
-                if phase == "Succeeded":
-                    print(f"    CSV {csv_name} is Succeeded")
-                    return
-                print(f"    CSV {csv_name} phase: {phase} ({elapsed}s)...")
+                matching_csv = item
                 break
+
+        if matching_csv:
+            csv_name = matching_csv.get("metadata", {}).get("name", "")
+            phase = matching_csv.get("status", {}).get("phase", "")
+            if phase == "Succeeded":
+                print(f"    CSV {csv_name} is Succeeded")
+                return
+            print(f"    CSV {csv_name} phase: {phase} ({elapsed}s)...")
 
         time.sleep(10)
 
