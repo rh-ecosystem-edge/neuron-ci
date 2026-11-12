@@ -1349,6 +1349,17 @@
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "unknown",
                 "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.21-stable-aws-neuron-operator-dra-e2e-weekly/2120698628250013696",
+                "job_timestamp": "1794455604",
+                "kmm_sanity_status": "N/A",
+                "kserve_status": "N/A",
+                "dra_status": "N/A"
+            },
+            {
+                "ocp_full_version": "4.21",
+                "neuron_operator_version": "unknown",
+                "neuron_driver_version": "unknown",
+                "test_status": "FAILURE",
                 "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.21-stable-aws-neuron-operator-kserve-e2e-weekly/2120396470094925824",
                 "job_timestamp": "1794382340",
                 "kmm_sanity_status": "N/A",
@@ -2356,6 +2367,17 @@
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "unknown",
                 "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-5.0-stable-aws-neuron-operator-kserve-e2e-weekly/2120758873961795584",
+                "job_timestamp": "1794468106",
+                "kmm_sanity_status": "N/A",
+                "kserve_status": "N/A",
+                "dra_status": "N/A"
+            },
+            {
+                "ocp_full_version": "5.0",
+                "neuron_operator_version": "unknown",
+                "neuron_driver_version": "unknown",
+                "test_status": "FAILURE",
                 "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-5.0-stable-aws-neuron-operator-dra-e2e-weekly/2119973767995199488",
                 "job_timestamp": "1794277525",
                 "kmm_sanity_status": "N/A",
@@ -2364,7 +2386,8 @@
             }
         ],
         "job_history_links": [
-            "https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-5.0-stable-aws-neuron-operator-dra-e2e-weekly"
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-5.0-stable-aws-neuron-operator-dra-e2e-weekly",
+            "https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-5.0-stable-aws-neuron-operator-kserve-e2e-weekly"
         ]
     }
 }
