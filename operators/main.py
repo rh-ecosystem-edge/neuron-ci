@@ -28,7 +28,6 @@ from operators.config import (
 from operators.constants import (
     DRA_KMM_CHANNEL,
     DRA_NEURON_CHANNEL,
-    DRA_NEURON_STARTING_CSV,
     KMM_CATALOG,
     KMM_CHANNEL,
     KMM_OPERATOR_GROUP,
@@ -139,7 +138,10 @@ def install_operators(oc: OcRunner, config: NeuronInstallConfig) -> None:
         channel=DRA_NEURON_CHANNEL if dra_mode else NEURON_CHANNEL,
         operator_group_name=NEURON_OPERATOR_GROUP,
         subscription_name=NEURON_SUBSCRIPTION,
-        starting_csv=DRA_NEURON_STARTING_CSV if dra_mode else "",
+        # Do not pin a starting CSV. OLM should select the latest release in
+        # the Stable channel instead of installing an older CSV and replacing
+        # it during the same run.
+        starting_csv="",
         timeout=config.operator_timeout,
     )
 
