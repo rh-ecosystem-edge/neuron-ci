@@ -43,7 +43,14 @@ def install_operator(
         oc, namespace, subscription_name, package_name, catalog_source, channel,
         starting_csv,
     )
-    _wait_for_csv(oc, namespace, package_name, timeout, starting_csv)
+    _wait_for_csv(
+        oc,
+        namespace,
+        package_name,
+        timeout,
+        expected_csv=starting_csv,
+        subscription_name=subscription_name,
+    )
 
     print(f"--- {package_name} installed successfully ---\n")
 
@@ -140,13 +147,46 @@ def _wait_for_csv(
     package_name: str,
     timeout: int,
     expected_csv: str = "",
+    subscription_name: str = "",
 ) -> None:
     """Wait for the ClusterServiceVersion to reach Succeeded phase."""
     print(f"  Waiting for {package_name} CSV to succeed (timeout={timeout}s)...")
+    if not expected_csv and not subscription_name:
+        raise ValueError(
+            "subscription_name is required when expected_csv is not provided"
+        )
+
     deadline = time.monotonic() + timeout
 
     while time.monotonic() < deadline:
         elapsed = int(time.monotonic() + timeout - deadline)
+
+        selected_csv = expected_csv
+        if not selected_csv:
+            subscription = oc.run(
+                "get", "subscription", subscription_name,
+                "-n", namespace,
+                "-o", "json",
+                timeout=30,
+            )
+            if subscription.returncode != 0:
+                print(f"    Cannot read Subscription yet ({elapsed}s)...")
+                time.sleep(10)
+                continue
+
+            try:
+                subscription_data = json.loads(subscription.stdout or "{}")
+            except json.JSONDecodeError:
+                print(f"    Subscription status is not available yet ({elapsed}s)...")
+                time.sleep(10)
+                continue
+
+            status = subscription_data.get("status") or {}
+            selected_csv = status.get("currentCSV") or status.get("installedCSV") or ""
+            if not selected_csv:
+                print(f"    Subscription has not selected a CSV yet ({elapsed}s)...")
+                time.sleep(10)
+                continue
 
         r = oc.run(
             "get", "csv", "-n", namespace,
@@ -168,17 +208,14 @@ def _wait_for_csv(
             csv_name = item.get("metadata", {}).get("name", "")
             phase = item.get("status", {}).get("phase", "")
 
-            csv_matches = (
-                csv_name == expected_csv
-                if expected_csv
-                else package_name in csv_name
-            )
-            if csv_matches:
+            if csv_name == selected_csv:
                 if phase == "Succeeded":
                     print(f"    CSV {csv_name} is Succeeded")
                     return
                 print(f"    CSV {csv_name} phase: {phase} ({elapsed}s)...")
                 break
+        else:
+            print(f"    CSV {selected_csv} not found yet ({elapsed}s)...")
 
         time.sleep(10)
 
