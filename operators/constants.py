@@ -22,10 +22,9 @@ KMM_CHANNEL = "stable"
 KMM_OPERATOR_GROUP = "kmm-operator-group"
 KMM_SUBSCRIPTION = "kmm-subscription"
 
-# DRA requires KMM 2.7+ on Kubernetes 1.34+. Keep the DRA installation on
-# the release channel and starting CSV that first shipped the feature.
-DRA_KMM_CHANNEL = "release-2.7"
-DRA_KMM_STARTING_CSV = "kernel-module-management.v2.7.0"
+# DRA requires KMM 2.7+ on Kubernetes 1.34+. Use the stable channel so OLM
+# selects the newest KMM release available in the cluster's catalog.
+DRA_KMM_CHANNEL = KMM_CHANNEL
 
 # Neuron operator
 NEURON_PACKAGE = "aws-neuron-operator"

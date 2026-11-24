@@ -1,7 +1,8 @@
 name: Generate Neuron test matrix page
 
 on:
-  pull_request_target:
+  # Use the standard PR event to avoid the public-repository default event block.
+  pull_request:
     branches:
       - main
     types: [closed]
@@ -29,7 +30,7 @@ permissions:
 
 jobs:
   generate-matrix:
-    if: github.event_name != 'pull_request_target' || github.repository == 'rh-ecosystem-edge/neuron-ci'
+    if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       DASHBOARD_OUTPUT_DIR: '.github/scripts/test_matrix_dashboard/output'
@@ -46,7 +47,7 @@ jobs:
         id: determine_pr
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" == "pull_request_target" ]; then
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" == "schedule" ]; then
             echo "PR_NUMBER=all" >> "$GITHUB_OUTPUT"
@@ -101,7 +102,7 @@ jobs:
       - name: Generate HTML Dashboard
         run: |
           cd "${{ env.DASHBOARD_OUTPUT_DIR }}"
-          if [[ "${{ github.event_name }}" == "pull_request_target" ]] && git diff --exit-code neuron_operator_matrix.json 2>/dev/null; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]] && git diff --exit-code neuron_operator_matrix.json 2>/dev/null; then
             echo "No data changes"
           else
             cd "${{ github.workspace }}"
@@ -111,6 +112,9 @@ jobs:
           fi
 
       - name: Deploy to GitHub Pages
+        # Fork PRs receive a read-only token. The scheduled job will publish
+        # their results, so avoid failing the PR workflow on the deploy step.
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: ${{ env.GH_PAGES_BRANCH }}
@@ -120,7 +124,8 @@ jobs:
 
       - name: Delete merged bot branch
         if: |
-          github.event_name == 'pull_request_target' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository &&
           github.event.pull_request.merged == true &&
           github.event.pull_request.user.login == 'github-actions[bot]'
         env:

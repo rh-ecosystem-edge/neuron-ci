@@ -149,7 +149,13 @@ def _wait_for_csv(
     expected_csv: str = "",
     subscription_name: str = "",
 ) -> None:
-    """Wait for the ClusterServiceVersion to reach Succeeded phase."""
+    """Wait for the selected ClusterServiceVersion to reach Succeeded.
+
+    When a starting CSV is not pinned, OLM selects the newest CSV available
+    in the Subscription channel. Follow ``status.currentCSV`` rather than
+    guessing from the CSV list, since the initially selected CSV may be
+    replaced while the catalog is resolving an update.
+    """
     print(f"  Waiting for {package_name} CSV to succeed (timeout={timeout}s)...")
     if not expected_csv and not subscription_name:
         raise ValueError(
