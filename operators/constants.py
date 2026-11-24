@@ -34,9 +34,10 @@ NEURON_CHANNEL = "Fast"
 NEURON_OPERATOR_GROUP = "neuron-operator-group"
 NEURON_SUBSCRIPTION = "neuron-subscription"
 
-# Neuron 1.3.0 is the first OLM release containing the KMM 2.7 DRA path.
+# Use the Stable channel for DRA and allow OLM to select its latest available
+# Neuron Operator release. The subscription must not pin an initial CSV: OLM
+# otherwise installs that CSV first and then upgrades it through the catalog.
 DRA_NEURON_CHANNEL = "Stable"
-DRA_NEURON_STARTING_CSV = "aws-neuron-operator.v1.3.0"
 
 # NFD rule for Neuron PCI device detection
 NFD_RULE_NAME = "neuron-nfd-rule"
