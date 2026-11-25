@@ -1382,6 +1382,17 @@
                 "neuron_operator_version": "unknown",
                 "neuron_driver_version": "unknown",
                 "test_status": "FAILURE",
+                "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.21-stable-aws-neuron-operator-kserve-e2e-weekly/2125469968899248128",
+                "job_timestamp": "1795591759",
+                "kmm_sanity_status": "N/A",
+                "kserve_status": "N/A",
+                "dra_status": "N/A"
+            },
+            {
+                "ocp_full_version": "4.21",
+                "neuron_operator_version": "unknown",
+                "neuron_driver_version": "unknown",
+                "test_status": "FAILURE",
                 "prow_job_url": "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/periodic-ci-rh-ecosystem-edge-neuron-ci-main-4.21-stable-aws-neuron-operator-e2e-weekly/2125107440495104000",
                 "job_timestamp": "1795506164",
                 "kmm_sanity_status": "N/A",
